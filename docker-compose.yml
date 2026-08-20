@@ -1,0 +1,23 @@
+# Local development infrastructure only — not used for Vercel, and not the
+# production deployment topology for the API (see apps/api/Dockerfile and
+# docs/ARCHITECTURE.md §R/§S for that).
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fenticoin
+    ports:
+      - '5432:5432'
+    volumes:
+      - fenticoin-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  fenticoin-postgres-data:

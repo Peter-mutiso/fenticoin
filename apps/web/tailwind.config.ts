@@ -1,0 +1,36 @@
+import type { Config } from 'tailwindcss';
+
+const config: Config = {
+  content: ['./src/**/*.{ts,tsx}'],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['var(--font-inter)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
+      colors: {
+        // Brand accent — positive movement, primary actions (Deposit, active nav).
+        brand: {
+          50: '#ECFDF5',
+          500: '#0FBE85',
+          600: '#0DA372',
+        },
+        // Portfolio card / active-nav-on-dark surface.
+        navy: {
+          900: '#101A2E',
+          950: '#0B1220',
+        },
+        // Negative movement.
+        loss: {
+          50: '#FEF2F2',
+          500: '#EF4444',
+        },
+      },
+      borderRadius: {
+        xl2: '1.25rem',
+      },
+    },
+  },
+  plugins: [],
+};
+
+export default config;
