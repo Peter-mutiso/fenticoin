@@ -108,6 +108,7 @@ function makeHarness(): Harness {
     contractRegistry,
     transactionService as unknown as TransactionService,
     auditLog as unknown as AuditLogService,
+    { emit: jest.fn() } as unknown as import('@nestjs/event-emitter').EventEmitter2,
   );
 
   return { service, db, tx, insertChain, txInsertChain, priceFeedService, transactionService, auditLog };

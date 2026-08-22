@@ -10,9 +10,11 @@ export interface ChainableMock {
   from: jest.Mock;
   where: jest.Mock;
   limit: jest.Mock;
+  offset: jest.Mock;
   innerJoin: jest.Mock;
   leftJoin: jest.Mock;
   orderBy: jest.Mock;
+  groupBy: jest.Mock;
   values: jest.Mock;
   set: jest.Mock;
   onConflictDoNothing: jest.Mock;
@@ -34,9 +36,11 @@ export function chainable<T>(result: T): ChainableMock {
     'from',
     'where',
     'limit',
+    'offset',
     'innerJoin',
     'leftJoin',
     'orderBy',
+    'groupBy',
     'values',
     'set',
     'onConflictDoNothing',

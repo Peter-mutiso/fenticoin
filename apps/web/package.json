@@ -13,17 +13,20 @@
     "clean": "rimraf .next coverage *.tsbuildinfo"
   },
   "dependencies": {
+    "@fenticoin/domain": "workspace:*",
     "@fenticoin/types": "workspace:*",
     "@tanstack/react-query": "^5.62.11",
     "lucide-react": "^0.469.0",
     "next": "^15.1.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "socket.io-client": "^4.8.1",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",

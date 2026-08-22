@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { and, desc, eq } from 'drizzle-orm';
 import { Money } from '@fenticoin/domain';
 
@@ -12,6 +13,7 @@ import { UsersService } from '../users/users.service';
 import { DRIZZLE_CLIENT } from '../database/database.constants';
 import type { DrizzleDb } from '../database/database.types';
 import { type Bet, type BetType, bets } from '../database/schema';
+import { buildBetEvent } from '../realtime/realtime-events';
 import { BettingConfigService } from './betting-config.service';
 import { BettingEligibilityService } from './betting-eligibility.service';
 import { BetContractRegistry } from './contracts/bet-contract.registry';
@@ -52,6 +54,7 @@ export class BettingService {
     private readonly contractRegistry: BetContractRegistry,
     private readonly oddsEngine: OddsEngine,
     private readonly transactionService: TransactionService,
+    private readonly events: EventEmitter2,
   ) {}
 
   async placeBet(input: PlaceBetInput): Promise<Bet> {
@@ -131,7 +134,7 @@ export class BettingService {
     // all in one DB transaction, so a crash midway leaves neither a
     // debited wallet with no bet nor a bet with no reserved funds.
     try {
-      return await this.db.transaction(async (tx) => {
+      const bet = await this.db.transaction(async (tx) => {
         const [betRow] = await tx
           .insert(bets)
           .values({
@@ -179,6 +182,14 @@ export class BettingService {
         // 11: return the confirmed bet.
         return linked;
       });
+
+      // Emitted after the transaction has durably committed, never from
+      // inside it — see realtime-events.ts and the plan's note on why
+      // wallet/bet events must never announce a change a later statement
+      // in the same transaction could still roll back.
+      const event = buildBetEvent(bet);
+      this.events.emit(event.type, event);
+      return bet;
     } catch (error) {
       if (input.idempotencyKey && isUniqueViolation(error)) {
         const existing = await this.findByIdempotencyKey(input.idempotencyKey);
@@ -205,6 +216,22 @@ export class BettingService {
       .select()
       .from(bets)
       .where(and(...conditions))
+      .orderBy(desc(bets.createdAt))
+      .limit(params.limit)
+      .offset(params.offset);
+  }
+
+  /** Admin view — optionally scoped to one user and/or one status, otherwise platform-wide. */
+  async listAll(params: { limit: number; offset: number; status?: Bet['status']; userId?: string; instrumentId?: string }): Promise<Bet[]> {
+    const conditions = [];
+    if (params.status) conditions.push(eq(bets.status, params.status));
+    if (params.userId) conditions.push(eq(bets.userId, params.userId));
+    if (params.instrumentId) conditions.push(eq(bets.instrumentId, params.instrumentId));
+
+    return this.db
+      .select()
+      .from(bets)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(bets.createdAt))
       .limit(params.limit)
       .offset(params.offset);

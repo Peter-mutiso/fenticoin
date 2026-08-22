@@ -1,4 +1,5 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 
 import { AuditLogService } from '../audit/audit-log.service';
@@ -7,6 +8,7 @@ import type { DrizzleDb } from '../database/database.types';
 import { type Bet, type BetSettlementAudit, type BetStatus, betSettlementAudits, bets } from '../database/schema';
 import { PriceFeedService } from '../markets/price-feed.service';
 import type { PriceQuote } from '../markets/price-quote';
+import { buildBetEvent } from '../realtime/realtime-events';
 import { TransactionService } from '../wallet/transaction.service';
 import { assertLegalBetTransition } from './bet-state-machine';
 import { BetContractRegistry } from './contracts/bet-contract.registry';
@@ -53,6 +55,7 @@ export class SettlementService {
     private readonly contractRegistry: BetContractRegistry,
     private readonly transactionService: TransactionService,
     private readonly auditLog: AuditLogService,
+    private readonly events: EventEmitter2,
   ) {}
 
   async settleBet(betId: string): Promise<Bet> {
@@ -65,7 +68,9 @@ export class SettlementService {
     }
 
     try {
-      return await this.process(claimed);
+      const settled = await this.process(claimed);
+      this.emitBetEvent(settled);
+      return settled;
     } catch (error) {
       await this.handleSettlementFailure(claimed, error);
       throw error;
@@ -149,6 +154,9 @@ export class SettlementService {
       });
 
       return final;
+    }).then((final) => {
+      this.emitBetEvent(final);
+      return final;
     });
   }
 
@@ -200,6 +208,7 @@ export class SettlementService {
         targetId: betId,
         after: { resolution: 'uphold', status: targetStatus, reason },
       });
+      this.emitBetEvent(updated);
       return updated;
     }
 
@@ -229,6 +238,7 @@ export class SettlementService {
       targetId: betId,
       after: { resolution: 'reverse', status: 'refunded', reason },
     });
+    this.emitBetEvent(updated);
     return updated;
   }
 
@@ -338,10 +348,18 @@ export class SettlementService {
       });
 
       return updated;
+    }).then((updated) => {
+      this.emitBetEvent(updated);
+      return updated;
     });
   }
 
   // ---- settlement internals ----------------------------------------------
+
+  private emitBetEvent(bet: Bet): void {
+    const event = buildBetEvent(bet);
+    this.events.emit(event.type, event);
+  }
 
   private async claim(betId: string): Promise<Bet | undefined> {
     const [claimed] = await this.db
@@ -403,6 +421,7 @@ export class SettlementService {
         targetId: bet.id,
         after: { attempts: attempt, reason: errorMessage },
       });
+      if (updated) this.emitBetEvent(updated);
     } else {
       this.logger.warn(
         `Settlement attempt ${attempt} failed for bet ${bet.id}, released back to open for retry: ${errorMessage}`,

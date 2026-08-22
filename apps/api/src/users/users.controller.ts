@@ -27,7 +27,9 @@ import type { RequestUser } from '../authorization/types/request-user';
 // Nest's ValidationPipe silently skips validation for that — see the
 // eslint.config.js note for why `consistent-type-imports` is off in this app.
 import { AssignRoleDto } from './dto/assign-role.dto';
+import { KycReviewDto } from './dto/kyc-review.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
+import { SetEligibilityDto } from './dto/set-eligibility.dto';
 import { SetUserStatusDto } from './dto/set-status.dto';
 import { UsersService } from './users.service';
 
@@ -47,7 +49,13 @@ export class UsersController {
   @RequirePermissions(PERMISSIONS.USERS_VIEW)
   @Get()
   async list(@Query() query: ListUsersQueryDto) {
-    return this.usersService.list({ limit: query.limit ?? 25, offset: query.offset ?? 0 });
+    return this.usersService.list({
+      email: query.email,
+      status: query.status,
+      kycStatus: query.kycStatus,
+      limit: query.limit ?? 25,
+      offset: query.offset ?? 0,
+    });
   }
 
   @RequirePermissions(PERMISSIONS.USERS_VIEW)
@@ -73,6 +81,48 @@ export class UsersController {
     @Req() req: Request,
   ) {
     return this.usersService.setStatus({
+      userId: id,
+      status: dto.status,
+      reason: dto.reason,
+      actorUserId: actor.id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
+  @RequirePermissions(PERMISSIONS.KYC_REVIEW)
+  @Post(':id/kyc-review')
+  async reviewKyc(
+    @Param('id') id: string,
+    @Body() dto: KycReviewDto,
+    @CurrentUser() actor: RequestUser,
+    @Req() req: Request,
+  ) {
+    return this.usersService.reviewKyc({
+      userId: id,
+      decision: dto.decision,
+      reason: dto.reason,
+      actorUserId: actor.id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
+  /**
+   * Restricts (or restores) the single account-wide eligibility flag that
+   * gates betting, withdrawals, and deposits — a risk/compliance action,
+   * not a profile edit, so this is gated on `users.suspend` (held by
+   * `risk`/`admin`) rather than `users.update`.
+   */
+  @RequirePermissions(PERMISSIONS.USERS_SUSPEND)
+  @Post(':id/eligibility')
+  async setEligibility(
+    @Param('id') id: string,
+    @Body() dto: SetEligibilityDto,
+    @CurrentUser() actor: RequestUser,
+    @Req() req: Request,
+  ) {
+    return this.usersService.setEligibility({
       userId: id,
       status: dto.status,
       reason: dto.reason,

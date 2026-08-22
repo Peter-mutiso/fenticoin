@@ -101,7 +101,7 @@ interface Harness {
 
 function makeHarness(): Harness {
   const insertedBet: Partial<Bet> = { id: 'bet-1', status: 'open' };
-  const linkedBet: Partial<Bet> = { id: 'bet-1', status: 'open', placementTransactionId: 'txn-1' };
+  const linkedBet: Partial<Bet> = { id: 'bet-1', status: 'open', userId: 'user-1', updatedAt: NOW, placementTransactionId: 'txn-1' };
 
   const insertChain = chainable([insertedBet]);
   const tx = {
@@ -137,6 +137,7 @@ function makeHarness(): Harness {
     contractRegistry,
     oddsEngine,
     transactionService as unknown as TransactionService,
+    { emit: jest.fn() } as unknown as import('@nestjs/event-emitter').EventEmitter2,
   );
 
   return {
@@ -287,5 +288,48 @@ describe('BettingService.placeBet', () => {
       const result = await h.service.placeBet(basePlaceInput({ idempotencyKey: 'key-2' }));
       expect(result).toBe(winnerBet);
     });
+  });
+});
+
+describe('BettingService.listAll — admin bet browsing', () => {
+  it('runs unfiltered when no filters are provided (platform-wide)', async () => {
+    const rows = [{ id: 'bet-1' } as Bet, { id: 'bet-2' } as Bet];
+    const select = jest.fn().mockReturnValue(chainable(rows));
+    const db = { select } as unknown as DrizzleDb;
+    const service = new BettingService(
+      db,
+      {} as UsersService,
+      {} as BettingEligibilityService,
+      {} as InstrumentService,
+      {} as PriceFeedService,
+      {} as BettingConfigService,
+      {} as BetContractRegistry,
+      {} as OddsEngine,
+      {} as TransactionService,
+      { emit: jest.fn() } as unknown as import('@nestjs/event-emitter').EventEmitter2,
+    );
+
+    const result = await service.listAll({ limit: 25, offset: 0 });
+    expect(result).toBe(rows);
+  });
+
+  it('composes status/userId/instrumentId filters independently when provided', async () => {
+    const select = jest.fn().mockReturnValue(chainable([]));
+    const db = { select } as unknown as DrizzleDb;
+    const service = new BettingService(
+      db,
+      {} as UsersService,
+      {} as BettingEligibilityService,
+      {} as InstrumentService,
+      {} as PriceFeedService,
+      {} as BettingConfigService,
+      {} as BetContractRegistry,
+      {} as OddsEngine,
+      {} as TransactionService,
+      { emit: jest.fn() } as unknown as import('@nestjs/event-emitter').EventEmitter2,
+    );
+
+    await service.listAll({ limit: 25, offset: 0, status: 'requires_review', userId: 'user-1', instrumentId: 'inst-btc' });
+    expect(select).toHaveBeenCalledTimes(1);
   });
 });

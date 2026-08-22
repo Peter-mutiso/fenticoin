@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { and, eq, isNull } from 'drizzle-orm';
 
 // Value imports (AppConfigService, TokenService): constructor-injected
@@ -32,6 +33,7 @@ export class SessionService {
     @Inject(DRIZZLE_CLIENT) private readonly db: DrizzleDb,
     private readonly tokenService: TokenService,
     private readonly config: AppConfigService,
+    private readonly events: EventEmitter2,
   ) {}
 
   async createSession(userId: string, meta: SessionMeta): Promise<{ session: Session; refreshTokenRaw: string }> {
@@ -80,10 +82,16 @@ export class SessionService {
   }
 
   async revoke(sessionId: string, reason: SessionRevokedReason): Promise<void> {
-    await this.db
+    const [revoked] = await this.db
       .update(sessions)
       .set({ revokedAt: new Date(), revokedReason: reason })
-      .where(and(eq(sessions.id, sessionId), isNull(sessions.revokedAt)));
+      .where(and(eq(sessions.id, sessionId), isNull(sessions.revokedAt)))
+      .returning({ userId: sessions.userId });
+
+    // Push side of mid-connection WS revocation — see
+    // realtime/mid-connection-revocation.service.ts. The backstop sweep
+    // there bounds the worst case if this is ever missed.
+    if (revoked) this.events.emit('auth.session_revoked', { userId: revoked.userId });
   }
 
   async revokeAllForUser(userId: string, reason: SessionRevokedReason): Promise<void> {
@@ -91,5 +99,7 @@ export class SessionService {
       .update(sessions)
       .set({ revokedAt: new Date(), revokedReason: reason })
       .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
+
+    this.events.emit('auth.session_revoked', { userId });
   }
 }

@@ -5,6 +5,7 @@ import { RequirePermissions } from '../authorization/decorators/require-permissi
 import { PERMISSIONS } from '../authorization/permissions.catalog';
 import type { RequestUser } from '../authorization/types/request-user';
 import { AdjustBalanceDto } from './dto/adjust-balance.dto';
+import { GrantBonusDto } from './dto/grant-bonus.dto';
 import { ListTransactionsQueryDto } from './dto/list-transactions-query.dto';
 import { serializeBalance, serializeTransaction } from './mappers';
 import { TransactionService } from './transaction.service';
@@ -59,6 +60,33 @@ export class AdminWalletController {
       currency: dto.currency,
       amount: BigInt(dto.amountMinorUnits),
       direction: dto.direction,
+      reason: dto.reason,
+      actorType: 'admin',
+      actorUserId: actor.id,
+      idempotencyKey,
+    });
+    return serializeTransaction(tx);
+  }
+
+  /**
+   * A one-off, audited real-money credit — the same ledger risk profile as
+   * an upward manual adjustment, so it requires the same `wallet.adjust`
+   * permission (held only by `finance`/`super_admin`, never plain `admin`).
+   * The resulting `bonus`-type transaction row is itself the audit record
+   * (actor/subject/reason), identical to how `adjustBalance` works.
+   */
+  @RequirePermissions(PERMISSIONS.WALLET_ADJUST)
+  @Post(':userId/grant-bonus')
+  async grantBonus(
+    @Param('userId') userId: string,
+    @Body() dto: GrantBonusDto,
+    @CurrentUser() actor: RequestUser,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    const tx = await this.transactionService.grantBonus({
+      userId,
+      currency: dto.currency,
+      amount: BigInt(dto.amountMinorUnits),
       reason: dto.reason,
       actorType: 'admin',
       actorUserId: actor.id,

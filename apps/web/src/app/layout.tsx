@@ -7,8 +7,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'FentiCoin Platform',
-  description: 'Portfolio, watchlist, and markets overview.',
+  title: 'FentiCoin — Markets, Trading & Portfolio',
+  description: 'Follow live markets, trade Rise/Fall, Higher/Lower and Up/Down, and manage your portfolio, deposits, and withdrawals in one account.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

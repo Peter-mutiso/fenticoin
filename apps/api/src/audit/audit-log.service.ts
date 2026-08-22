@@ -1,8 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { and, desc, eq, gte, lte } from 'drizzle-orm';
 
 import { DRIZZLE_CLIENT } from '../database/database.constants';
 import type { DrizzleDb } from '../database/database.types';
-import { auditLogs } from '../database/schema';
+import { type AuditLog, auditLogs } from '../database/schema';
 
 export interface RecordAuditEventInput {
   actorUserId: string | null;
@@ -15,6 +16,17 @@ export interface RecordAuditEventInput {
   ipAddress?: string;
   userAgent?: string;
   metadata?: unknown;
+}
+
+export interface ListAuditLogsFilters {
+  actorUserId?: string;
+  targetType?: string;
+  targetId?: string;
+  action?: string;
+  from?: string;
+  to?: string;
+  limit: number;
+  offset: number;
 }
 
 /**
@@ -39,5 +51,27 @@ export class AuditLogService {
       userAgent: event.userAgent,
       metadata: event.metadata,
     });
+  }
+
+  /** Read side, for the admin audit-log view. Every filter is optional and independently composed. */
+  async list(filters: ListAuditLogsFilters): Promise<{ items: AuditLog[] }> {
+    const conditions = [
+      filters.actorUserId ? eq(auditLogs.actorUserId, filters.actorUserId) : undefined,
+      filters.targetType ? eq(auditLogs.targetType, filters.targetType) : undefined,
+      filters.targetId ? eq(auditLogs.targetId, filters.targetId) : undefined,
+      filters.action ? eq(auditLogs.action, filters.action) : undefined,
+      filters.from ? gte(auditLogs.createdAt, new Date(filters.from)) : undefined,
+      filters.to ? lte(auditLogs.createdAt, new Date(filters.to)) : undefined,
+    ].filter((condition): condition is NonNullable<typeof condition> => condition !== undefined);
+
+    const items = await this.db
+      .select()
+      .from(auditLogs)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(filters.limit)
+      .offset(filters.offset);
+
+    return { items };
   }
 }

@@ -76,6 +76,15 @@ export const transactionTypeEnum = pgEnum('transaction_type', [
   'adjustment',
   'fee',
   'reversal',
+  // Withdrawal review flow (see payments/withdrawal.service.ts): a
+  // withdrawal request holds funds (available -> locked) at request time,
+  // long before real money leaves the house; 'withdrawal' (above) is the
+  // older, direct available -> house_cash movement and is deliberately
+  // left alone — 'withdrawal_settlement' is what the reviewed flow uses to
+  // actually send money out, sourced from the hold, not from available.
+  'withdrawal_hold',
+  'withdrawal_release',
+  'withdrawal_settlement',
 ]);
 export type TransactionType = (typeof transactionTypeEnum.enumValues)[number];
 
@@ -89,6 +98,55 @@ export type TransactionStatus = (typeof transactionStatusEnum.enumValues)[number
 
 export const transactionActorTypeEnum = pgEnum('transaction_actor_type', ['user', 'admin', 'system']);
 export type TransactionActorType = (typeof transactionActorTypeEnum.enumValues)[number];
+
+// ---- payments (deposits / withdrawals) ------------------------------------
+
+/**
+ * Lifecycle for one deposit attempt. `pending` is the only non-terminal
+ * state — every other value is final. A deposit only reaches `completed`
+ * after trusted server-side verification (see
+ * `payments/deposit.service.ts`); it is never set from a webhook payload
+ * or client claim alone.
+ */
+export const depositStatusEnum = pgEnum('deposit_status', [
+  'pending',
+  'completed',
+  'failed',
+  'cancelled',
+  'expired',
+]);
+export type DepositStatus = (typeof depositStatusEnum.enumValues)[number];
+
+/**
+ * Lifecycle for one withdrawal request. Full legal-transition table lives
+ * in `payments/withdrawal-state-machine.ts`; summary:
+ *   pending_review -> approved | rejected
+ *   approved -> submitted | failed (provider submission itself can fail)
+ *   submitted -> completed | failed
+ *   completed -> reversed (admin-initiated, after the fact)
+ * `rejected`, `failed`, `reversed` are terminal; so is `completed` unless reversed.
+ */
+export const withdrawalStatusEnum = pgEnum('withdrawal_status', [
+  'pending_review',
+  'approved',
+  'rejected',
+  'submitted',
+  'completed',
+  'failed',
+  'reversed',
+]);
+export type WithdrawalStatus = (typeof withdrawalStatusEnum.enumValues)[number];
+
+/** How one inbound webhook delivery was handled — recorded for every delivery, including retries/duplicates, for audit and investigation. */
+export const paymentWebhookOutcomeEnum = pgEnum('payment_webhook_outcome', [
+  'processed',
+  'duplicate_ignored',
+  'invalid_signature',
+  'unrecognized_reference',
+  'verification_mismatch',
+  'error',
+]);
+export type PaymentWebhookOutcome = (typeof paymentWebhookOutcomeEnum.enumValues)[number];
 
 // ---- markets / instruments ---------------------------------------------
 

@@ -1,9 +1,11 @@
 import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { and, desc, eq } from 'drizzle-orm';
 
 import { DRIZZLE_CLIENT } from '../database/database.constants';
 import type { DrizzleDb } from '../database/database.types';
 import { ledgerEntries, type Transaction, type TransactionActorType, transactions } from '../database/schema';
+import { buildWalletTransactionEvent } from '../realtime/realtime-events';
 import { LedgerService, type LedgerEntryInput } from './ledger.service';
 import { requireCurrency } from './wallet.constants';
 import { WalletService } from './wallet.service';
@@ -58,6 +60,20 @@ export interface ReverseTransactionInput {
  * Idempotency: every method accepts an optional `idempotencyKey`. A
  * second call with the same key returns the original result without
  * re-executing the mutation — see `withIdempotency` below.
+ *
+ * Real-time `wallet.transaction_posted` emission: only the methods below
+ * that own their own transaction (no optional `tx` parameter — `withdraw`,
+ * `grantBonus`, `chargeFee`, `adjustBalance`, `reverseTransaction`,
+ * `reverseCompletedWithdrawal`) emit here. The other methods (`deposit`,
+ * `placeBet`, `settleBetWin`/`settleBetLoss`, the withdrawal hold/release/
+ * settle trio) are always called with a caller-owned `tx` in this codebase
+ * — the caller's own transaction hasn't committed yet when they return, so
+ * emitting from inside them would risk announcing a change a later
+ * statement in the *caller's* transaction could still roll back. Those are
+ * instead covered by the caller's own domain event (`bet.updated`/
+ * `bet.settled`/`deposit.status_changed`/`withdrawal.status_changed`),
+ * which the frontend already treats as "also refetch the wallet" for
+ * terminal transitions — see the real-time layer plan.
  */
 @Injectable()
 export class TransactionService {
@@ -65,30 +81,188 @@ export class TransactionService {
     @Inject(DRIZZLE_CLIENT) private readonly db: DrizzleDb,
     private readonly walletService: WalletService,
     private readonly ledgerService: LedgerService,
+    private readonly events: EventEmitter2,
   ) {}
 
-  async deposit(input: MoneyMovementInput): Promise<Transaction> {
+  async deposit(input: MoneyMovementInput, tx?: DrizzleDb): Promise<Transaction> {
+    this.assertPositiveAmount(input.amount);
+    const currency = requireCurrency(input.currency);
+
+    return this.withIdempotency(
+      input.idempotencyKey,
+      async (t) => {
+        const accounts = await this.walletService.getOrCreateWalletAccounts(t, input.userId, currency.code);
+        const houseCash = await this.walletService.getSystemAccount(t, 'house_cash', currency.code);
+
+        const txRow = await this.insertTransactionRow(t, {
+          type: 'deposit',
+          currency: currency.code,
+          totalAmount: input.amount,
+          subjectUserId: input.userId,
+          meta: input,
+        });
+
+        await this.ledgerService.postEntries(t, txRow.id, currency.code, [
+          { ledgerAccountId: houseCash.id, direction: 'debit', amount: input.amount },
+          { ledgerAccountId: accounts.available.id, direction: 'credit', amount: input.amount },
+        ]);
+
+        return txRow;
+      },
+      tx,
+    );
+  }
+
+  /** Withdrawal request accepted: reserves the stake (available -> locked), same-currency internal transfer — no money has left the house yet. */
+  async holdForWithdrawal(input: MoneyMovementInput, tx?: DrizzleDb): Promise<Transaction> {
+    this.assertPositiveAmount(input.amount);
+    const currency = requireCurrency(input.currency);
+
+    return this.withIdempotency(
+      input.idempotencyKey,
+      async (t) => {
+        const accounts = await this.walletService.getOrCreateWalletAccounts(t, input.userId, currency.code);
+
+        const txRow = await this.insertTransactionRow(t, {
+          type: 'withdrawal_hold',
+          currency: currency.code,
+          totalAmount: input.amount,
+          subjectUserId: input.userId,
+          meta: input,
+        });
+
+        // Insufficient-funds is enforced by LedgerService (the debit below
+        // would take `available` negative) — no separate pre-check needed.
+        await this.ledgerService.postEntries(t, txRow.id, currency.code, [
+          { ledgerAccountId: accounts.available.id, direction: 'debit', amount: input.amount },
+          { ledgerAccountId: accounts.locked.id, direction: 'credit', amount: input.amount },
+        ]);
+
+        return txRow;
+      },
+      tx,
+    );
+  }
+
+  /** A held withdrawal did not proceed (rejected, or provider submission/settlement failed): returns the reservation to available. */
+  async releaseWithdrawalHold(input: MoneyMovementInput, tx?: DrizzleDb): Promise<Transaction> {
+    this.assertPositiveAmount(input.amount);
+    const currency = requireCurrency(input.currency);
+
+    return this.withIdempotency(
+      input.idempotencyKey,
+      async (t) => {
+        const accounts = await this.walletService.getOrCreateWalletAccounts(t, input.userId, currency.code);
+
+        const txRow = await this.insertTransactionRow(t, {
+          type: 'withdrawal_release',
+          currency: currency.code,
+          totalAmount: input.amount,
+          subjectUserId: input.userId,
+          meta: input,
+        });
+
+        await this.ledgerService.postEntries(t, txRow.id, currency.code, [
+          { ledgerAccountId: accounts.locked.id, direction: 'debit', amount: input.amount },
+          { ledgerAccountId: accounts.available.id, direction: 'credit', amount: input.amount },
+        ]);
+
+        return txRow;
+      },
+      tx,
+    );
+  }
+
+  /** A held withdrawal is confirmed settled by the provider: the reservation actually leaves the house (locked -> house_cash). */
+  async settleWithdrawal(input: MoneyMovementInput, tx?: DrizzleDb): Promise<Transaction> {
+    this.assertPositiveAmount(input.amount);
+    const currency = requireCurrency(input.currency);
+
+    return this.withIdempotency(
+      input.idempotencyKey,
+      async (t) => {
+        const accounts = await this.walletService.getOrCreateWalletAccounts(t, input.userId, currency.code);
+        const houseCash = await this.walletService.getSystemAccount(t, 'house_cash', currency.code);
+
+        const txRow = await this.insertTransactionRow(t, {
+          type: 'withdrawal_settlement',
+          currency: currency.code,
+          totalAmount: input.amount,
+          subjectUserId: input.userId,
+          meta: input,
+        });
+
+        await this.ledgerService.postEntries(t, txRow.id, currency.code, [
+          { ledgerAccountId: accounts.locked.id, direction: 'debit', amount: input.amount },
+          { ledgerAccountId: houseCash.id, direction: 'credit', amount: input.amount },
+        ]);
+
+        return txRow;
+      },
+      tx,
+    );
+  }
+
+  /**
+   * Reverses an already-*completed* withdrawal (e.g. the provider later
+   * reports a clawback, or fraud is discovered after the fact) — credits
+   * the amount straight back to the user's spendable `available` balance
+   * (not `locked`: there is nothing "in progress" to re-reserve, the
+   * funds should simply be usable again) and marks the original
+   * settlement transaction `reversed`.
+   */
+  async reverseCompletedWithdrawal(input: {
+    settlementTransactionId: string;
+    userId: string;
+    currency: string;
+    amount: bigint;
+    actorUserId: string;
+    reason: string;
+    idempotencyKey?: string;
+  }): Promise<Transaction> {
     this.assertPositiveAmount(input.amount);
     const currency = requireCurrency(input.currency);
 
     return this.withIdempotency(input.idempotencyKey, async (tx) => {
+      const [original] = await tx.select().from(transactions).where(eq(transactions.id, input.settlementTransactionId)).limit(1);
+      if (!original) {
+        throw new BadRequestException(`Transaction ${input.settlementTransactionId} not found`);
+      }
+      if (original.status !== 'posted') {
+        throw new ConflictException(`Cannot reverse a transaction with status "${original.status}"`);
+      }
+
       const accounts = await this.walletService.getOrCreateWalletAccounts(tx, input.userId, currency.code);
       const houseCash = await this.walletService.getSystemAccount(tx, 'house_cash', currency.code);
 
-      const txRow = await this.insertTransactionRow(tx, {
-        type: 'deposit',
+      const reversalRow = await this.insertTransactionRow(tx, {
+        type: 'reversal',
         currency: currency.code,
         totalAmount: input.amount,
         subjectUserId: input.userId,
-        meta: input,
+        meta: {
+          actorType: 'admin',
+          actorUserId: input.actorUserId,
+          reason: input.reason,
+          relatedType: 'transaction',
+          relatedId: original.id,
+          idempotencyKey: input.idempotencyKey,
+        },
       });
 
-      await this.ledgerService.postEntries(tx, txRow.id, currency.code, [
+      await tx.update(transactions).set({ reversalOfTransactionId: original.id }).where(eq(transactions.id, reversalRow.id));
+
+      await this.ledgerService.postEntries(tx, reversalRow.id, currency.code, [
         { ledgerAccountId: houseCash.id, direction: 'debit', amount: input.amount },
         { ledgerAccountId: accounts.available.id, direction: 'credit', amount: input.amount },
       ]);
 
-      return txRow;
+      await tx.update(transactions).set({ status: 'reversed' }).where(eq(transactions.id, original.id));
+
+      return reversalRow;
+    }).then((reversalRow) => {
+      this.emitWalletEvent(reversalRow);
+      return reversalRow;
     });
   }
 
@@ -116,6 +290,9 @@ export class TransactionService {
         { ledgerAccountId: houseCash.id, direction: 'credit', amount: input.amount },
       ]);
 
+      return txRow;
+    }).then((txRow) => {
+      this.emitWalletEvent(txRow);
       return txRow;
     });
   }
@@ -245,6 +422,9 @@ export class TransactionService {
 
   async grantBonus(input: MoneyMovementInput): Promise<Transaction> {
     this.assertPositiveAmount(input.amount);
+    if (!input.reason?.trim()) {
+      throw new BadRequestException('A reason is required for a manual bonus grant');
+    }
     const currency = requireCurrency(input.currency);
 
     return this.withIdempotency(input.idempotencyKey, async (tx) => {
@@ -264,6 +444,9 @@ export class TransactionService {
         { ledgerAccountId: accounts.available.id, direction: 'credit', amount: input.amount },
       ]);
 
+      return txRow;
+    }).then((txRow) => {
+      this.emitWalletEvent(txRow);
       return txRow;
     });
   }
@@ -289,6 +472,9 @@ export class TransactionService {
         { ledgerAccountId: houseRevenue.id, direction: 'credit', amount: input.amount },
       ]);
 
+      return txRow;
+    }).then((txRow) => {
+      this.emitWalletEvent(txRow);
       return txRow;
     });
   }
@@ -332,6 +518,9 @@ export class TransactionService {
 
       await this.ledgerService.postEntries(tx, txRow.id, currency.code, entries);
 
+      return txRow;
+    }).then((txRow) => {
+      this.emitWalletEvent(txRow);
       return txRow;
     });
   }
@@ -391,6 +580,9 @@ export class TransactionService {
       await tx.update(transactions).set({ status: 'reversed' }).where(eq(transactions.id, original.id));
 
       return reversalRow;
+    }).then((reversalRow) => {
+      this.emitWalletEvent(reversalRow);
+      return reversalRow;
     });
   }
 
@@ -405,6 +597,11 @@ export class TransactionService {
   }
 
   // ---- shared plumbing --------------------------------------------------
+
+  private emitWalletEvent(transaction: Transaction): void {
+    const event = buildWalletTransactionEvent(transaction);
+    this.events.emit(event.type, event);
+  }
 
   private assertPositiveAmount(amount: bigint): void {
     if (amount <= 0n) {

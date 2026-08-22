@@ -1,4 +1,4 @@
-import { CurrencyMismatchError, Money, NonIntegerAmountError } from './money';
+import { CurrencyMismatchError, InvalidDecimalStringError, Money, NonIntegerAmountError } from './money';
 import { EUR, USD } from './currency';
 
 describe('Money', () => {
@@ -89,5 +89,53 @@ describe('Money', () => {
   it('serializes to JSON without precision loss', () => {
     const a = Money.fromMinorUnits(9_007_199_254_740_993n, USD); // > Number.MAX_SAFE_INTEGER
     expect(a.toJSON()).toEqual({ amountMinorUnits: '9007199254740993', currency: 'USD' });
+  });
+
+  describe('fromDecimalString', () => {
+    it('parses a plain decimal amount', () => {
+      expect(Money.fromDecimalString('12.50', USD).toMinorUnits()).toBe(1250n);
+    });
+
+    it('parses a whole-number amount with no decimal point', () => {
+      expect(Money.fromDecimalString('10', USD).toMinorUnits()).toBe(1000n);
+    });
+
+    it('pads a shorter fractional part out to the currency\'s decimals', () => {
+      expect(Money.fromDecimalString('10.5', USD).toMinorUnits()).toBe(1050n);
+    });
+
+    it('truncates (never rounds) precision finer than the currency supports', () => {
+      expect(Money.fromDecimalString('10.999', USD).toMinorUnits()).toBe(1099n);
+    });
+
+    it('parses a negative amount', () => {
+      expect(Money.fromDecimalString('-5.25', USD).toMinorUnits()).toBe(-525n);
+    });
+
+    it('parses a leading-plus amount', () => {
+      expect(Money.fromDecimalString('+5.25', USD).toMinorUnits()).toBe(525n);
+    });
+
+    it('round-trips through toDecimalString', () => {
+      expect(Money.fromDecimalString('4321.09', USD).toDecimalString()).toBe('4321.09');
+    });
+
+    it('rejects an empty string', () => {
+      expect(() => Money.fromDecimalString('', USD)).toThrow(InvalidDecimalStringError);
+      expect(() => Money.fromDecimalString('   ', USD)).toThrow(InvalidDecimalStringError);
+    });
+
+    it('rejects non-numeric input', () => {
+      expect(() => Money.fromDecimalString('abc', USD)).toThrow(InvalidDecimalStringError);
+      expect(() => Money.fromDecimalString('12.3.4', USD)).toThrow(InvalidDecimalStringError);
+      expect(() => Money.fromDecimalString('1e5', USD)).toThrow(InvalidDecimalStringError);
+      expect(() => Money.fromDecimalString('12,50', USD)).toThrow(InvalidDecimalStringError);
+    });
+
+    it('never produces a value through floating-point multiplication', () => {
+      // A value that famously loses precision if parsed via Number() * 100.
+      expect(Money.fromDecimalString('0.1', USD).toMinorUnits()).toBe(10n);
+      expect(Money.fromDecimalString('0.29', USD).toMinorUnits()).toBe(29n);
+    });
   });
 });

@@ -36,6 +36,13 @@
       "when": 1787228627612,
       "tag": "0004_blue_lady_ursula",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787294150369,
+      "tag": "0005_right_ironclad",
+      "breakpoints": true
     }
   ]
 }

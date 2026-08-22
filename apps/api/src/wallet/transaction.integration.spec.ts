@@ -52,7 +52,7 @@ describe('Wallet/ledger integration (real Postgres)', () => {
 
     walletService = new WalletService(db as never);
     ledgerService = new LedgerService();
-    transactionService = new TransactionService(db as never, walletService, ledgerService);
+    transactionService = new TransactionService(db as never, walletService, ledgerService, { emit: () => true } as never);
   }, 120_000);
 
   afterAll(async () => {

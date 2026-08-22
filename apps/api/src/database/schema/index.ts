@@ -8,5 +8,6 @@ export * from './two-factor';
 export * from './rbac';
 export * from './audit-logs';
 export * from './wallet';
+export * from './payments';
 export * from './markets';
 export * from './betting';

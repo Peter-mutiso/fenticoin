@@ -44,7 +44,7 @@ module.exports = tseslint.config(
 
   // Frontend (React/Next.js) files.
   {
-    files: ['apps/web/**/*.{ts,tsx}'],
+    files: ['apps/web/**/*.{ts,tsx}', 'apps/admin/**/*.{ts,tsx}'],
     plugins: {
       react,
       'react-hooks': reactHooks,

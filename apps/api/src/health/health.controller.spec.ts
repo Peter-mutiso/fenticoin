@@ -1,12 +1,17 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
+import { IS_PUBLIC_KEY } from '../authorization/decorators/public.decorator';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
 
 describe('HealthController', () => {
   let controller: HealthController;
   let service: jest.Mocked<HealthService>;
+
+  it('is marked @Public() — a load balancer/orchestrator must be able to probe it without a bearer token', () => {
+    expect(Reflect.getMetadata(IS_PUBLIC_KEY, HealthController)).toBe(true);
+  });
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({

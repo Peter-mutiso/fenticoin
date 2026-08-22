@@ -8,10 +8,16 @@ import { ValidationPipe } from '@nestjs/common';
 
 import { AppModule } from './app.module';
 import { AppConfigService } from './config/app-config.service';
+import { AppIoAdapter } from './realtime/socket-io.adapter';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
+    // Preserves the exact request bytes on `req.rawBody` alongside the
+    // normally-parsed `req.body` — payment webhook signature verification
+    // (see payments/webhook.controller.ts) must hash/sign the literal
+    // bytes the provider sent, not a re-serialized JSON.parse of them.
+    rawBody: true,
   });
 
   app.useLogger(app.get(Logger));
@@ -38,6 +44,8 @@ async function bootstrap(): Promise<void> {
   });
 
   app.set('trust proxy', 1);
+
+  app.useWebSocketAdapter(new AppIoAdapter(app));
 
   await app.listen(config.port, '0.0.0.0');
 }

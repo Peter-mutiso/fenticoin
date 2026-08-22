@@ -1,10 +1,12 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { and, desc, eq, ne } from 'drizzle-orm';
 
 import { AuditLogService } from '../audit/audit-log.service';
 import { DRIZZLE_CLIENT } from '../database/database.constants';
 import type { DrizzleDb } from '../database/database.types';
 import { type Instrument, type InstrumentStatus, instruments } from '../database/schema';
+import { buildInstrumentStatusEvent } from '../realtime/realtime-events';
 import { SUPPORTED_CURRENCIES } from '../wallet/wallet.constants';
 import type { MarketSessionSchedule } from './market-session';
 
@@ -40,6 +42,7 @@ export class InstrumentService {
   constructor(
     @Inject(DRIZZLE_CLIENT) private readonly db: DrizzleDb,
     private readonly auditLog: AuditLogService,
+    private readonly events: EventEmitter2,
   ) {}
 
   async list(params: { includeDelisted?: boolean; categoryKey?: string } = {}): Promise<Instrument[]> {
@@ -160,6 +163,9 @@ export class InstrumentService {
       before: { status: before.status },
       after: { status: input.status, reason: input.reason },
     });
+
+    const event = buildInstrumentStatusEvent(after);
+    this.events.emit(event.type, event);
 
     return after;
   }

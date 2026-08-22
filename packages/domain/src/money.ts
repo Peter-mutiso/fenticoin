@@ -62,6 +62,38 @@ export class Money {
     return new Money(BigInt(amount), currency);
   }
 
+  /**
+   * Parses a decimal string (e.g. "12.50", user-typed input) into `Money`,
+   * scaled to the currency's own `decimals` — using only string/BigInt
+   * arithmetic, never `Number()` multiplication, so typed input can never
+   * pick up floating-point error on its way into a request. Truncates
+   * (never rounds) any precision finer than the currency supports.
+   */
+  static fromDecimalString(value: string, currency: Currency): Money {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      throw new InvalidDecimalStringError(value);
+    }
+
+    const negative = trimmed.startsWith('-');
+    const unsigned = negative ? trimmed.slice(1) : trimmed.startsWith('+') ? trimmed.slice(1) : trimmed;
+
+    const parts = unsigned.split('.');
+    if (parts.length > 2) {
+      throw new InvalidDecimalStringError(value);
+    }
+    const [wholePartRaw, fractionPartRaw = ''] = parts;
+    const wholePart = wholePartRaw || '0';
+
+    if (!/^\d+$/.test(wholePart) || !/^\d*$/.test(fractionPartRaw)) {
+      throw new InvalidDecimalStringError(value);
+    }
+
+    const fractionPart = fractionPartRaw.slice(0, currency.decimals).padEnd(currency.decimals, '0');
+    const magnitude = BigInt(wholePart + fractionPart);
+    return new Money(negative ? -magnitude : magnitude, currency);
+  }
+
   static zero(currency: Currency): Money {
     return new Money(0n, currency);
   }

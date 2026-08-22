@@ -7,8 +7,9 @@ import { InstrumentService } from './instrument.service';
 
 function makeService(db: Partial<DrizzleDb>, audit: Partial<AuditLogService> = {}) {
   const auditLog = { record: jest.fn(), ...audit } as unknown as AuditLogService;
-  const service = new InstrumentService(db as DrizzleDb, auditLog);
-  return { service, auditLog };
+  const events = { emit: jest.fn() } as unknown as import('@nestjs/event-emitter').EventEmitter2;
+  const service = new InstrumentService(db as DrizzleDb, auditLog, events);
+  return { service, auditLog, events };
 }
 
 describe('InstrumentService', () => {
@@ -69,7 +70,7 @@ describe('InstrumentService', () => {
   describe('setStatus', () => {
     it('updates status and records an audit entry with before/after', async () => {
       const select = jest.fn().mockReturnValue(chainable([{ id: 'inst-1', status: 'active' }]));
-      const update = jest.fn().mockReturnValue(chainable([{ id: 'inst-1', status: 'suspended' }]));
+      const update = jest.fn().mockReturnValue(chainable([{ id: 'inst-1', status: 'suspended', updatedAt: new Date() }]));
       const { service, auditLog } = makeService({ select, update });
 
       const result = await service.setStatus({

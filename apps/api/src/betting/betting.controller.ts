@@ -3,14 +3,25 @@ import { Body, Controller, Get, Headers, NotFoundException, Param, Post, Query }
 import { CurrentUser } from '../authorization/decorators/current-user.decorator';
 import type { RequestUser } from '../authorization/types/request-user';
 import { BettingService } from './betting.service';
+import { BettingConfigService } from './betting-config.service';
 import { ListBetsQueryDto } from './dto/list-bets-query.dto';
 import { PlaceBetDto } from './dto/place-bet.dto';
-import { serializeBet } from './mappers';
+import { serializeBet, serializeBettingConfig } from './mappers';
 
 /** Self-service betting endpoints — always scoped to the authenticated user's own bets. */
 @Controller('betting')
 export class BettingController {
-  constructor(private readonly bettingService: BettingService) {}
+  constructor(
+    private readonly bettingService: BettingService,
+    private readonly bettingConfigService: BettingConfigService,
+  ) {}
+
+  /** Current placement rules. Bet placement re-reads these server-side. */
+  @Get('configs')
+  async getConfig(@Query('instrumentId') instrumentId?: string, @Query('type') type?: PlaceBetDto['type']) {
+    if (!instrumentId || !type) throw new NotFoundException('instrumentId and type are required');
+    return serializeBettingConfig(await this.bettingConfigService.get(instrumentId, type));
+  }
 
   @Post('bets')
   async placeBet(

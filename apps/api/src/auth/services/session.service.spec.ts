@@ -16,6 +16,7 @@ function makeTokenService(): TokenService {
 }
 
 const config = { refreshTokenTtlDays: 30 } as AppConfigService;
+const events = { emit: jest.fn() } as unknown as import('@nestjs/event-emitter').EventEmitter2;
 
 describe('SessionService', () => {
   it('creates a session with a hashed refresh token', async () => {
@@ -23,7 +24,7 @@ describe('SessionService', () => {
       chainable([{ id: 'session-1', userId: 'user-1', refreshTokenHash: 'hash-1' }]),
     );
     const db = { insert } as unknown as DrizzleDb;
-    const service = new SessionService(db, makeTokenService(), config);
+    const service = new SessionService(db, makeTokenService(), config, events);
 
     const { session, refreshTokenRaw } = await service.createSession('user-1', {});
     expect(session.id).toBe('session-1');
@@ -33,7 +34,7 @@ describe('SessionService', () => {
   it('rotate() returns invalid for an unknown refresh token', async () => {
     const select = jest.fn().mockReturnValue(chainable([]));
     const db = { select } as unknown as DrizzleDb;
-    const service = new SessionService(db, makeTokenService(), config);
+    const service = new SessionService(db, makeTokenService(), config, events);
 
     await expect(service.rotate('nope', {})).resolves.toEqual({ outcome: 'invalid' });
   });
@@ -45,7 +46,7 @@ describe('SessionService', () => {
         chainable([{ id: 's1', userId: 'u1', revokedAt: null, expiresAt: new Date(Date.now() - 1000) }]),
       );
     const db = { select } as unknown as DrizzleDb;
-    const service = new SessionService(db, makeTokenService(), config);
+    const service = new SessionService(db, makeTokenService(), config, events);
 
     await expect(service.rotate('raw', {})).resolves.toEqual({ outcome: 'invalid' });
   });
@@ -58,7 +59,7 @@ describe('SessionService', () => {
       );
     const update = jest.fn().mockReturnValue(chainable(undefined));
     const db = { select, update } as unknown as DrizzleDb;
-    const service = new SessionService(db, makeTokenService(), config);
+    const service = new SessionService(db, makeTokenService(), config, events);
 
     const result = await service.rotate('raw', {});
     expect(result).toEqual({ outcome: 'reused' });
@@ -74,7 +75,7 @@ describe('SessionService', () => {
     const insert = jest.fn().mockReturnValue(chainable([{ id: 's2', userId: 'u1' }]));
     const update = jest.fn().mockReturnValue(chainable(undefined));
     const db = { select, insert, update } as unknown as DrizzleDb;
-    const service = new SessionService(db, makeTokenService(), config);
+    const service = new SessionService(db, makeTokenService(), config, events);
 
     const result = await service.rotate('raw', {});
     expect(result.outcome).toBe('rotated');

@@ -85,11 +85,13 @@ function makeHarness(options: { existingByIdempotencyKey?: Transaction | undefin
       ),
   };
   const ledgerService = { postEntries: jest.fn().mockResolvedValue(undefined) };
+  const events = { emit: jest.fn() };
 
   const service = new TransactionService(
     db as unknown as DrizzleDb,
     walletService as unknown as WalletService,
     ledgerService as unknown as LedgerService,
+    events as unknown as import('@nestjs/event-emitter').EventEmitter2,
   );
 
   return { service, db, tx, walletService, ledgerService };
@@ -239,12 +241,26 @@ describe('TransactionService', () => {
   describe('grantBonus / chargeFee', () => {
     it('funds a bonus from house_liability', async () => {
       const h = makeHarness();
-      await h.service.grantBonus({ userId: 'user-1', currency: 'USD', amount: 25n, actorType: 'admin', actorUserId: 'admin-1' });
+      await h.service.grantBonus({
+        userId: 'user-1',
+        currency: 'USD',
+        amount: 25n,
+        actorType: 'admin',
+        actorUserId: 'admin-1',
+        reason: 'welcome bonus',
+      });
 
       expect(h.ledgerService.postEntries).toHaveBeenCalledWith(h.tx, 'tx-1', 'USD', [
         { ledgerAccountId: 'sys-house_liability', direction: 'debit', amount: 25n },
         { ledgerAccountId: 'acct-available', direction: 'credit', amount: 25n },
       ]);
+    });
+
+    it('rejects a bonus grant with no reason', async () => {
+      const h = makeHarness();
+      await expect(
+        h.service.grantBonus({ userId: 'user-1', currency: 'USD', amount: 25n, actorType: 'admin', actorUserId: 'admin-1' }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('routes a fee to house_revenue', async () => {
@@ -382,6 +398,91 @@ describe('TransactionService', () => {
       await expect(
         h.service.deposit({ userId: 'user-1', currency: 'USD', amount: 500n, actorType: 'system' }),
       ).rejects.toThrow('ledger post failed');
+    });
+  });
+
+  describe('holdForWithdrawal', () => {
+    it('reserves the stake purely internally (available -> locked), never touching a house account', async () => {
+      const h = makeHarness();
+      await h.service.holdForWithdrawal({ userId: 'user-1', currency: 'USD', amount: 200n, actorType: 'user', actorUserId: 'user-1' });
+
+      expect(h.ledgerService.postEntries).toHaveBeenCalledWith(h.tx, 'tx-1', 'USD', [
+        { ledgerAccountId: 'acct-available', direction: 'debit', amount: 200n },
+        { ledgerAccountId: 'acct-locked', direction: 'credit', amount: 200n },
+      ]);
+      expect(h.walletService.getSystemAccount).not.toHaveBeenCalled();
+    });
+
+    it('propagates InsufficientFundsError without posting anything', async () => {
+      const h = makeHarness();
+      h.ledgerService.postEntries.mockRejectedValue(new InsufficientFundsError({ accountId: 'acct-available', requested: 200n, available: 50n }));
+
+      await expect(
+        h.service.holdForWithdrawal({ userId: 'user-1', currency: 'USD', amount: 200n, actorType: 'user', actorUserId: 'user-1' }),
+      ).rejects.toThrow(InsufficientFundsError);
+    });
+  });
+
+  describe('releaseWithdrawalHold', () => {
+    it('returns a held reservation back to available', async () => {
+      const h = makeHarness();
+      await h.service.releaseWithdrawalHold({ userId: 'user-1', currency: 'USD', amount: 200n, actorType: 'admin', actorUserId: 'admin-1', reason: 'rejected' });
+
+      expect(h.ledgerService.postEntries).toHaveBeenCalledWith(h.tx, 'tx-1', 'USD', [
+        { ledgerAccountId: 'acct-locked', direction: 'debit', amount: 200n },
+        { ledgerAccountId: 'acct-available', direction: 'credit', amount: 200n },
+      ]);
+    });
+  });
+
+  describe('settleWithdrawal', () => {
+    it('sends a held reservation out of the house (locked -> house_cash)', async () => {
+      const h = makeHarness();
+      await h.service.settleWithdrawal({ userId: 'user-1', currency: 'USD', amount: 200n, actorType: 'system' });
+
+      expect(h.ledgerService.postEntries).toHaveBeenCalledWith(h.tx, 'tx-1', 'USD', [
+        { ledgerAccountId: 'acct-locked', direction: 'debit', amount: 200n },
+        { ledgerAccountId: 'sys-house_cash', direction: 'credit', amount: 200n },
+      ]);
+    });
+  });
+
+  describe('reverseCompletedWithdrawal', () => {
+    it('rejects reversing a transaction that is not currently posted', async () => {
+      const h = makeHarness();
+      h.tx.select.mockReturnValueOnce(chainable([txRow({ status: 'reversed' })]));
+
+      await expect(
+        h.service.reverseCompletedWithdrawal({
+          settlementTransactionId: 'tx-1',
+          userId: 'user-1',
+          currency: 'USD',
+          amount: 200n,
+          actorUserId: 'admin-1',
+          reason: 'provider clawback',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('credits the amount straight back to available (not locked) and marks the original reversed', async () => {
+      const h = makeHarness();
+      h.tx.select.mockReturnValueOnce(chainable([txRow({ id: 'settle-1', type: 'withdrawal_settlement', status: 'posted' })]));
+
+      await h.service.reverseCompletedWithdrawal({
+        settlementTransactionId: 'settle-1',
+        userId: 'user-1',
+        currency: 'USD',
+        amount: 200n,
+        actorUserId: 'admin-1',
+        reason: 'provider clawback',
+      });
+
+      expect(h.ledgerService.postEntries).toHaveBeenCalledWith(h.tx, 'tx-1', 'USD', [
+        { ledgerAccountId: 'sys-house_cash', direction: 'debit', amount: 200n },
+        { ledgerAccountId: 'acct-available', direction: 'credit', amount: 200n },
+      ]);
+      // Two updates: setting reversalOfTransactionId on the new row, and status='reversed' on the original.
+      expect(h.tx.update).toHaveBeenCalledTimes(2);
     });
   });
 

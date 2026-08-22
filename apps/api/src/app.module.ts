@@ -3,6 +3,7 @@ import type { IncomingMessage } from 'node:http';
 
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { LoggerModule } from 'nestjs-pino';
 
 import { AppConfigService } from './config/app-config.service';
@@ -17,12 +18,21 @@ import { PermissionsGuard } from './authorization/guards/permissions.guard';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { MarketsModule } from './markets/markets.module';
+import { PaymentsModule } from './payments/payments.module';
+import { RealtimeModule } from './realtime/realtime.module';
+import { ReportsModule } from './reports/reports.module';
 import { UsersModule } from './users/users.module';
 import { WalletModule } from './wallet/wallet.module';
 
 @Module({
   imports: [
     ConfigModule,
+    // Global internal event bus (EventEmitter2) — decouples domain services
+    // (bet settlement, deposits, withdrawals, wallet, markets) from the
+    // real-time transport layer that broadcasts their side effects; see
+    // RealtimeModule. Registered once here since AuthModule/UsersModule
+    // also emit revocation events consumed there.
+    EventEmitterModule.forRoot(),
     LoggerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [AppConfigService],
@@ -60,6 +70,9 @@ import { WalletModule } from './wallet/wallet.module';
     WalletModule,
     MarketsModule,
     BettingModule,
+    PaymentsModule,
+    ReportsModule,
+    RealtimeModule,
   ],
   providers: [
     {

@@ -5,7 +5,9 @@ import { RequirePermissions } from '../authorization/decorators/require-permissi
 import { PERMISSIONS } from '../authorization/permissions.catalog';
 import type { RequestUser } from '../authorization/types/request-user';
 import { BettingConfigService } from './betting-config.service';
+import { BettingService } from './betting.service';
 import { BetActionReasonDto, ResolveDisputeDto, ResolveManualReviewDto } from './dto/bet-action-reason.dto';
+import { ListAdminBetsQueryDto } from './dto/list-admin-bets-query.dto';
 import { UpsertBettingConfigDto } from './dto/upsert-betting-config.dto';
 import { serializeBet, serializeBettingConfig, serializeSettlementAudit } from './mappers';
 import { SettlementService } from './settlement.service';
@@ -18,9 +20,24 @@ import { SettlementService } from './settlement.service';
 @Controller('admin/betting')
 export class AdminBettingController {
   constructor(
+    private readonly bettingService: BettingService,
     private readonly bettingConfigService: BettingConfigService,
     private readonly settlementService: SettlementService,
   ) {}
+
+  /** Admin bet browsing — active, completed, cancelled/void, disputed, all optionally scoped to one user/instrument. */
+  @RequirePermissions(PERMISSIONS.BETS_VIEW)
+  @Get('bets')
+  async listBets(@Query() query: ListAdminBetsQueryDto) {
+    const items = await this.bettingService.listAll({
+      limit: query.limit ?? 25,
+      offset: query.offset ?? 0,
+      status: query.status,
+      userId: query.userId,
+      instrumentId: query.instrumentId,
+    });
+    return { items: items.map(serializeBet) };
+  }
 
   @RequirePermissions(PERMISSIONS.MARKETS_VIEW)
   @Get('configs')
@@ -81,6 +98,15 @@ export class AdminBettingController {
   async listRequiringReview() {
     const items = await this.settlementService.listRequiringReview();
     return { items: items.map(serializeBet) };
+  }
+
+  // Must be registered after every static `bets/...` route above (e.g.
+  // `bets/requiring-review`) — a `:id` param route would otherwise shadow
+  // them, since Express matches routes in declaration order.
+  @RequirePermissions(PERMISSIONS.BETS_VIEW)
+  @Get('bets/:id')
+  async getBet(@Param('id') id: string) {
+    return serializeBet(await this.bettingService.getById(id));
   }
 
   /** Every settlement attempt (successful or not) recorded for this bet — the settlement audit trail. */
