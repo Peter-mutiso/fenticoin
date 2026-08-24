@@ -15,6 +15,7 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS build
 COPY packages ./packages
 COPY apps/api ./apps/api
+
 RUN pnpm --filter @fenticoin/domain build \
  && pnpm --filter @fenticoin/types build \
  && pnpm --filter @fenticoin/api build
@@ -27,17 +28,25 @@ COPY packages/types/package.json packages/types/
 COPY apps/api/package.json apps/api/
 
 RUN pnpm install --frozen-lockfile --prod --filter @fenticoin/api... --shamefully-hoist
-FROM node:22-slim AS runtime
+
+FROM base AS runtime
 ENV NODE_ENV=production
 WORKDIR /repo
 
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 nestjs
 
+# Copy workspace-level production dependencies
 COPY --from=prod-deps /repo/node_modules ./node_modules
+
+# Copy API-level production dependencies
 COPY --from=prod-deps /repo/apps/api/node_modules ./apps/api/node_modules
+
+# Copy compiled workspace packages
 COPY --from=build /repo/packages/domain/dist ./packages/domain/dist
 COPY --from=build /repo/packages/types/dist ./packages/types/dist
+
+# Copy compiled API
 COPY --from=build /repo/apps/api/dist ./apps/api/dist
 COPY --from=build /repo/apps/api/package.json ./apps/api/package.json
 COPY --from=build /repo/apps/api/drizzle ./apps/api/drizzle
