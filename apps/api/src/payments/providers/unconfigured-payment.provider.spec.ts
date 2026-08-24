@@ -1,20 +1,49 @@
-import { UnconfiguredPaymentProvider } from './unconfigured-payment.provider';
+import { Injectable } from '@nestjs/common';
 
-describe('UnconfiguredPaymentProvider', () => {
-  it('reports itself as not configured', () => {
-    expect(new UnconfiguredPaymentProvider().isConfigured()).toBe(false);
-  });
+import { ProviderNotConfiguredError } from '../../auth/providers/provider-not-configured.error';
+import type {
+  DepositIntent,
+  PaymentProvider,
+  PaymentProviderWebhookEvent,
+  PaymentVerificationResult,
+  WithdrawalResult,
+} from './payment-provider.interface';
 
-  it('never fabricates a successful deposit or withdrawal', async () => {
-    const provider = new UnconfiguredPaymentProvider();
-    await expect(provider.createDeposit()).rejects.toThrow('not configured');
-    await expect(provider.createWithdrawal()).rejects.toThrow('not configured');
-    await expect(provider.verifyDeposit()).rejects.toThrow('not configured');
-    await expect(provider.verifyWithdrawal()).rejects.toThrow('not configured');
-  });
+/**
+ * The only PaymentProvider implementation until the client's chosen
+ * vendor is integrated.
+ *
+ * Every method fails explicitly. There is no fake/dev payment success.
+ */
+@Injectable()
+export class UnconfiguredPaymentProvider implements PaymentProvider {
+  readonly name = 'Payments (unconfigured)';
 
-  it('never parses a webhook as valid', () => {
-    const provider = new UnconfiguredPaymentProvider();
-    expect(() => provider.parseWebhookEvent()).toThrow('not configured');
-  });
-});
+  isConfigured(): boolean {
+    return false;
+  }
+
+  async createDeposit(): Promise<DepositIntent> {
+    await Promise.resolve();
+    throw new ProviderNotConfiguredError('Payment provider');
+  }
+
+  async createWithdrawal(): Promise<WithdrawalResult> {
+    await Promise.resolve();
+    throw new ProviderNotConfiguredError('Payment provider');
+  }
+
+  parseWebhookEvent(): PaymentProviderWebhookEvent {
+    throw new ProviderNotConfiguredError('Payment provider');
+  }
+
+  async verifyDeposit(): Promise<PaymentVerificationResult> {
+    await Promise.resolve();
+    throw new ProviderNotConfiguredError('Payment provider');
+  }
+
+  async verifyWithdrawal(): Promise<PaymentVerificationResult> {
+    await Promise.resolve();
+    throw new ProviderNotConfiguredError('Payment provider');
+  }
+}
