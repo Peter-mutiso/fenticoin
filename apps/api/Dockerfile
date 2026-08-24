@@ -25,7 +25,8 @@ COPY packages/config/package.json packages/config/
 COPY packages/domain/package.json packages/domain/
 COPY packages/types/package.json packages/types/
 COPY apps/api/package.json apps/api/
-RUN pnpm install --frozen-lockfile --prod
+
+RUN pnpm install --frozen-lockfile --prod --filter @fenticoin/api...
 
 FROM node:22-slim AS runtime
 ENV NODE_ENV=production
@@ -35,15 +36,12 @@ RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 nestjs
 
 COPY --from=prod-deps /repo/node_modules ./node_modules
-COPY --from=prod-deps /repo/packages ./packages
+COPY --from=prod-deps /repo/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /repo/packages/domain/dist ./packages/domain/dist
 COPY --from=build /repo/packages/types/dist ./packages/types/dist
 COPY --from=build /repo/apps/api/dist ./apps/api/dist
 COPY --from=build /repo/apps/api/package.json ./apps/api/package.json
 COPY --from=build /repo/apps/api/drizzle ./apps/api/drizzle
-
-# Ensure runtime dependency is present
-RUN test -f /repo/node_modules/.pnpm/reflect-metadata@0.2.2/node_modules/reflect-metadata/index.js
 
 USER nestjs
 WORKDIR /repo/apps/api
