@@ -15,8 +15,8 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS build
 COPY packages ./packages
 COPY apps/api ./apps/api
-RUN pnpm --filter @fenticoin/domain build `
- && pnpm --filter @fenticoin/types build `
+RUN pnpm --filter @fenticoin/domain build \
+ && pnpm --filter @fenticoin/types build \
  && pnpm --filter @fenticoin/api build
 
 FROM base AS prod-deps
@@ -31,7 +31,7 @@ FROM node:22-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /repo
 
-RUN addgroup --system --gid 1001 nodejs `
+RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 nestjs
 
 COPY --from=prod-deps /repo/node_modules ./node_modules
