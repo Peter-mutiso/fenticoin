@@ -1,13 +1,12 @@
-import { Lock, Wallet } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
+import Link from 'next/link';
 
 import { formatCurrencyMinorUnits } from '@/lib/money';
 
-/** The navy-950 balance summary card used on Home and Portfolio — shows available balance, and locked balance when it's meaningful (i.e. non-zero or explicitly requested). */
+/** The FentiCoin style portfolio balance card with Deposit & Withdraw buttons. */
 export function BalanceCard({
   availableMinorUnits,
-  lockedMinorUnits,
   currency,
-  showLocked = false,
 }: {
   availableMinorUnits: string;
   lockedMinorUnits?: string;
@@ -15,22 +14,33 @@ export function BalanceCard({
   showLocked?: boolean;
 }) {
   return (
-    <div className="rounded-2xl bg-navy-950 p-5 text-white shadow-sm sm:p-6">
-      <div className="flex items-center gap-2 text-white/65">
-        <Wallet className="h-4 w-4" aria-hidden="true" />
-        <span className="text-sm font-semibold">Available balance</span>
+    <div className="rounded-3xl bg-[#091628] p-5 text-white shadow-xl border border-white/10 sm:p-6">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-white/60">Real Portfolio</span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-brand-500/15 px-2.5 py-1 text-xs font-bold text-brand-400">
+          <ArrowUpRight className="h-3.5 w-3.5" /> 0.29%
+        </span>
       </div>
-      <p className="mt-2 text-3xl font-bold tracking-tight">{formatCurrencyMinorUnits(availableMinorUnits, currency)}</p>
 
-      {showLocked && lockedMinorUnits !== undefined && (
-        <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4 text-sm">
-          <span className="flex items-center gap-1.5 text-white/60">
-            <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-            Locked in open bets
-          </span>
-          <span className="font-semibold">{formatCurrencyMinorUnits(lockedMinorUnits, currency)}</span>
-        </div>
-      )}
+      <p className="mt-2 text-3xl font-bold tracking-tight">
+        {formatCurrencyMinorUnits(availableMinorUnits, currency)}
+      </p>
+
+      {/* Deposit and Withdraw Action Buttons side-by-side */}
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <Link
+          href="/deposit"
+          className="flex items-center justify-center rounded-2xl bg-[#00C853] py-3 text-sm font-bold text-neutral-950 shadow-lg shadow-emerald-500/20 transition hover:bg-[#00b048]"
+        >
+          Deposit
+        </Link>
+        <Link
+          href="/withdraw"
+          className="flex items-center justify-center rounded-2xl bg-[#1e293b] py-3 text-sm font-bold text-white/90 border border-white/10 transition hover:bg-[#273548]"
+        >
+          Withdraw
+        </Link>
+      </div>
     </div>
   );
 }

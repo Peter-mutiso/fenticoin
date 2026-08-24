@@ -7,20 +7,18 @@ import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { BettingExperience } from '@/components/betting/BettingExperience';
 import { BalanceCard } from '@/components/wallet/BalanceCard';
 import { FeaturedInstruments } from './FeaturedInstruments';
-import { QuickActions } from './QuickActions';
 
 export function HomeDashboard() {
   const { status: authStatus } = useAuth();
   const balance = useWalletBalance();
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="space-y-6 pb-8 max-w-xl mx-auto">
       {authStatus === 'authenticated' ? (
         <div className="space-y-4">
           {balance.data && (
             <BalanceCard availableMinorUnits={balance.data.availableMinorUnits} lockedMinorUnits={balance.data.lockedMinorUnits} currency={balance.data.currency} showLocked />
           )}
-          <QuickActions />
         </div>
       ) : (
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4">

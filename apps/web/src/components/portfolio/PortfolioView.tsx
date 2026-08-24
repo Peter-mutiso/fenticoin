@@ -64,7 +64,11 @@ export function PortfolioView() {
           ) : betsQuery.error ? (
             <Notice text={describeApiError(betsQuery.error).title} />
           ) : openBets.length === 0 ? (
-            <EmptyState icon={Briefcase} title="You don't have any open positions." action={{ label: 'Place a bet', href: '/' }} />
+            <EmptyState 
+              icon={Briefcase} 
+              title="You don't have any open positions." 
+              action={{ label: 'Place a bet', href: '/trade' }} 
+            />
           ) : (
             <ul className="space-y-2">
               {openBets.map((bet) => (

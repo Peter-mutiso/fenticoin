@@ -10,7 +10,11 @@ import {
   WebSocketServer,
   WsException,
 } from '@nestjs/websockets';
-import { instrumentRoom, userRoom, type RealtimeEvent } from '@fenticoin/types';
+import {
+  instrumentRoom,
+  userRoom,
+  type RealtimeEvent,
+} from '@fenticoin/types';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { Server, Socket } from 'socket.io';
 
@@ -42,12 +46,20 @@ export interface AuthenticatedSocketData {
  * signal).
  */
 @WebSocketGateway()
-export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class RealtimeGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server!: Server;
 
   private readonly logger = new Logger(RealtimeGateway.name);
-  private readonly instrumentSubscriptions = new Map<string, Set<string>>(); // instrumentId -> socket ids, for price forwarding cleanup
+
+  private readonly instrumentSubscriptions = new Map<
+    string,
+    Set<string>
+  >(); // instrumentId -> socket ids, for price forwarding cleanup
+
+  private readonly forwardingInstruments = new Set<string>();
 
   constructor(
     private readonly realtimeAuth: RealtimeAuthService,
@@ -58,6 +70,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   afterInit(server: Server): void {
     server.use((socket: Socket, next: (err?: Error) => void) => {
       const token = socket.handshake.auth?.token as string | undefined;
+
       this.realtimeAuth
         .authenticate(token)
         .then((user) => {
@@ -65,7 +78,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
           next();
         })
         .catch((error: unknown) => {
-          const message = error instanceof UnauthorizedException ? error.message : 'Authentication failed';
+          const message =
+            error instanceof UnauthorizedException
+              ? error.message
+              : 'Authentication failed';
+
           next(new Error(message));
         });
     });
@@ -75,6 +92,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     // Auth already succeeded (middleware above ran first) — this only
     // ever fires for an authenticated socket.
     const user = (socket.data as AuthenticatedSocketData).user;
+
     await socket.join(userRoom(user.id));
   }
 
@@ -85,9 +103,15 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   }
 
   @SubscribeMessage('subscribe:instrument')
-  async subscribeInstrument(@ConnectedSocket() socket: Socket, @MessageBody() body: { instrumentId?: string }): Promise<void> {
+  async subscribeInstrument(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() body: { instrumentId?: string },
+  ): Promise<void> {
     const instrumentId = body?.instrumentId;
-    if (!instrumentId) throw new WsException('instrumentId is required');
+
+    if (!instrumentId) {
+      throw new WsException('instrumentId is required');
+    }
 
     // Validates the instrument exists — the room is public within the
     // namespace (instrument data isn't user-scoped), this just guards
@@ -100,25 +124,64 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   }
 
   @SubscribeMessage('unsubscribe:instrument')
-  async unsubscribeInstrument(@ConnectedSocket() socket: Socket, @MessageBody() body: { instrumentId?: string }): Promise<void> {
+  async unsubscribeInstrument(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() body: { instrumentId?: string },
+  ): Promise<void> {
     const instrumentId = body?.instrumentId;
-    if (!instrumentId) return;
+
+    if (!instrumentId) {
+      return;
+    }
+
     await socket.leave(instrumentRoom(instrumentId));
     this.instrumentSubscriptions.get(instrumentId)?.delete(socket.id);
   }
 
-  /** Force-disconnects every socket for a user — called on logout/suspend, see `MidConnectionRevocationService`. */
+  /**
+   * Force-disconnects every socket for a user — called on logout/suspend,
+   * see `MidConnectionRevocationService`.
+   */
   disconnectUser(userId: string): void {
-    this.server.in(userRoom(userId)).disconnectSockets(true);
+    const server = this.server;
+
+    if (!server) {
+      return;
+    }
+
+    server.in(userRoom(userId)).disconnectSockets(true);
   }
 
-  /** Force-disconnects one specific socket by session — used by the backstop sweep. */
+  /**
+   * Force-disconnects one specific socket by session — used by the
+   * backstop sweep.
+   */
   disconnectSocket(socketId: string): void {
-    this.server.in(socketId).disconnectSockets(true);
+    const server = this.server;
+
+    if (!server) {
+      return;
+    }
+
+    server.in(socketId).disconnectSockets(true);
   }
 
+  /**
+   * Returns all currently connected end-user namespace sockets.
+   *
+   * Socket.IO initialization happens after Nest constructs the gateway.
+   * The scheduled stale-session sweep can therefore run while the gateway
+   * is not yet fully initialized. Return an empty list instead of
+   * dereferencing an unavailable Socket.IO socket map.
+   */
   allConnectedSockets(): Socket[] {
-    return [...this.server.sockets.sockets.values()];
+    const server = this.server;
+
+    if (!server?.sockets?.sockets) {
+      return [];
+    }
+
+    return [...server.sockets.sockets.values()];
   }
 
   @OnEvent('bet.updated')
@@ -128,44 +191,73 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   @OnEvent('wallet.transaction_posted')
   @OnEvent('notification.new')
   broadcastPrivateEvent(event: RealtimeEvent): void {
-    if (!event.userId) return;
+    if (!event.userId) {
+      return;
+    }
+
     try {
-      this.server.in(userRoom(event.userId)).emit(event.type, event);
+      this.server
+        .in(userRoom(event.userId))
+        .emit(event.type, event);
     } catch (error) {
-      this.logger.error(`Failed to broadcast ${event.type} for user ${event.userId}: ${String(error)}`);
+      this.logger.error(
+        `Failed to broadcast ${event.type} for user ${event.userId}: ${String(
+          error,
+        )}`,
+      );
     }
   }
 
   @OnEvent('market.status')
   broadcastMarketStatus(event: RealtimeEvent): void {
     try {
-      this.server.in(instrumentRoom(event.entityId)).emit(event.type, event);
+      this.server
+        .in(instrumentRoom(event.entityId))
+        .emit(event.type, event);
     } catch (error) {
-      this.logger.error(`Failed to broadcast market.status for instrument ${event.entityId}: ${String(error)}`);
+      this.logger.error(
+        `Failed to broadcast market.status for instrument ${event.entityId}: ${String(
+          error,
+        )}`,
+      );
     }
   }
 
   // ---- price forwarding: subscribes to PriceFeedService's existing
   // Observable directly rather than re-deriving price events, per the plan.
 
-  private readonly forwardingInstruments = new Set<string>();
-
   private ensurePriceForwarding(instrumentId: string): void {
-    if (this.forwardingInstruments.has(instrumentId)) return;
+    if (this.forwardingInstruments.has(instrumentId)) {
+      return;
+    }
+
     this.forwardingInstruments.add(instrumentId);
 
     this.priceFeedService.priceStream$(instrumentId).subscribe((quote) => {
       try {
         const event = buildMarketPriceEvent(quote);
-        this.server.in(instrumentRoom(instrumentId)).emit(event.type, event);
+
+        this.server
+          .in(instrumentRoom(instrumentId))
+          .emit(event.type, event);
       } catch (error) {
-        this.logger.error(`Failed to forward price tick for ${instrumentId}: ${String(error)}`);
+        this.logger.error(
+          `Failed to forward price tick for ${instrumentId}: ${String(
+            error,
+          )}`,
+        );
       }
     });
   }
 
-  private trackInstrumentSubscription(instrumentId: string, socketId: string): void {
-    const existing = this.instrumentSubscriptions.get(instrumentId) ?? new Set<string>();
+  private trackInstrumentSubscription(
+    instrumentId: string,
+    socketId: string,
+  ): void {
+    const existing =
+      this.instrumentSubscriptions.get(instrumentId) ??
+      new Set<string>();
+
     existing.add(socketId);
     this.instrumentSubscriptions.set(instrumentId, existing);
   }

@@ -10,11 +10,19 @@ import {
   WebSocketServer,
   WsException,
 } from '@nestjs/websockets';
-import { adminTopicRoom, ADMIN_TOPICS, type AdminTopic, type RealtimeEvent } from '@fenticoin/types';
+import {
+  adminTopicRoom,
+  ADMIN_TOPICS,
+  type AdminTopic,
+  type RealtimeEvent,
+} from '@fenticoin/types';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { Server, Socket } from 'socket.io';
 
-import { PERMISSIONS, type PermissionKey } from '../authorization/permissions.catalog';
+import {
+  PERMISSIONS,
+  type PermissionKey,
+} from '../authorization/permissions.catalog';
 import type { RequestUser } from '../authorization/types/request-user';
 import { RealtimeAuthService } from './realtime-auth.service';
 
@@ -47,7 +55,9 @@ const ADMIN_TOPIC_PERMISSIONS: Record<AdminTopic, PermissionKey> = {
  * rooms — defense in depth beyond the per-topic permission checks below.
  */
 @WebSocketGateway({ namespace: 'admin' })
-export class AdminRealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class AdminRealtimeGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server!: Server;
 
@@ -62,20 +72,30 @@ export class AdminRealtimeGateway implements OnGatewayInit, OnGatewayConnection,
     // at all, and sockets can't emit that reserved event name themselves).
     server.use((socket: Socket, next: (err?: Error) => void) => {
       const token = socket.handshake.auth?.token as string | undefined;
+
       this.realtimeAuth
         .authenticate(token)
         .then((user) => {
           const permissionSet = new Set(user.permissions);
-          const hasAnyAdminAccess = BASELINE_ADMIN_PERMISSIONS.some((p) => permissionSet.has(p));
+
+          const hasAnyAdminAccess = BASELINE_ADMIN_PERMISSIONS.some((p) =>
+            permissionSet.has(p),
+          );
+
           if (!hasAnyAdminAccess) {
             next(new Error('Account has no administrative access'));
             return;
           }
+
           (socket.data as AuthenticatedSocketData).user = user;
           next();
         })
         .catch((error: unknown) => {
-          const message = error instanceof UnauthorizedException ? error.message : 'Authentication failed';
+          const message =
+            error instanceof UnauthorizedException
+              ? error.message
+              : 'Authentication failed';
+
           next(new Error(message));
         });
     });
@@ -92,14 +112,19 @@ export class AdminRealtimeGateway implements OnGatewayInit, OnGatewayConnection,
   }
 
   @SubscribeMessage('subscribe:admin-topic')
-  subscribeAdminTopic(@ConnectedSocket() socket: Socket, @MessageBody() body: { topic?: string }): void {
+  subscribeAdminTopic(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() body: { topic?: string },
+  ): void {
     const topic = body?.topic as AdminTopic | undefined;
+
     if (!topic || !ADMIN_TOPICS.includes(topic)) {
       throw new WsException('Unknown admin topic');
     }
 
     const user = (socket.data as AuthenticatedSocketData).user;
     const requiredPermission = ADMIN_TOPIC_PERMISSIONS[topic];
+
     if (!user.permissions.includes(requiredPermission)) {
       throw new WsException('Forbidden');
     }
@@ -108,26 +133,61 @@ export class AdminRealtimeGateway implements OnGatewayInit, OnGatewayConnection,
   }
 
   @SubscribeMessage('unsubscribe:admin-topic')
-  unsubscribeAdminTopic(@ConnectedSocket() socket: Socket, @MessageBody() body: { topic?: string }): void {
+  unsubscribeAdminTopic(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() body: { topic?: string },
+  ): void {
     const topic = body?.topic as AdminTopic | undefined;
-    if (!topic) return;
+
+    if (!topic) {
+      return;
+    }
+
     void socket.leave(adminTopicRoom(topic));
   }
 
   disconnectUser(userId: string): void {
-    for (const socket of this.server.sockets.sockets.values()) {
-      if ((socket.data as AuthenticatedSocketData).user?.id === userId) {
+    const server = this.server;
+
+    if (!server?.sockets?.sockets) {
+      return;
+    }
+
+    for (const socket of server.sockets.sockets.values()) {
+      if (
+        (socket.data as AuthenticatedSocketData).user?.id === userId
+      ) {
         socket.disconnect(true);
       }
     }
   }
 
   disconnectSocket(socketId: string): void {
-    this.server.in(socketId).disconnectSockets(true);
+    const server = this.server;
+
+    if (!server) {
+      return;
+    }
+
+    server.in(socketId).disconnectSockets(true);
   }
 
+  /**
+   * Returns all currently connected admin namespace sockets.
+   *
+   * The gateway may be instantiated before Socket.IO has finished
+   * initializing the namespace. The stale-session sweeper runs on a
+   * scheduled job, so this method must safely return an empty list rather
+   * than dereferencing an uninitialized Socket.IO server.
+   */
   allConnectedSockets(): Socket[] {
-    return [...this.server.sockets.sockets.values()];
+    const server = this.server;
+
+    if (!server?.sockets?.sockets) {
+      return [];
+    }
+
+    return [...server.sockets.sockets.values()];
   }
 
   @OnEvent('deposit.status_changed')
@@ -152,7 +212,11 @@ export class AdminRealtimeGateway implements OnGatewayInit, OnGatewayConnection,
         this.server.in(adminTopicRoom(topic)).emit(event.type, event);
       }
     } catch (error) {
-      this.logger.error(`Failed to broadcast ${event.type} to admin topics [${topics.join(', ')}]: ${String(error)}`);
+      this.logger.error(
+        `Failed to broadcast ${event.type} to admin topics [${topics.join(
+          ', ',
+        )}]: ${String(error)}`,
+      );
     }
   }
 }

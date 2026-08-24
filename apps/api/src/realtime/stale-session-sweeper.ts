@@ -33,22 +33,63 @@ export class StaleSessionSweeper {
 
   @Cron(CronExpression.EVERY_5_MINUTES)
   async sweep(): Promise<void> {
-    const sockets = [...this.realtimeGateway.allConnectedSockets(), ...this.adminRealtimeGateway.allConnectedSockets()];
-    let disconnected = 0;
+    try {
+      const sockets = [
+        ...this.realtimeGateway.allConnectedSockets(),
+        ...this.adminRealtimeGateway.allConnectedSockets(),
+      ];
 
-    for (const socket of sockets) {
-      const user = (socket.data as AuthenticatedSocketData).user;
-      if (!user) continue;
-
-      const stillValid = await this.realtimeAuth.isSessionStillValid(user.sessionId, user.id);
-      if (!stillValid) {
-        socket.disconnect(true);
-        disconnected++;
+      if (sockets.length === 0) {
+        return;
       }
-    }
 
-    if (disconnected > 0) {
-      this.logger.log(`Backstop sweep force-disconnected ${disconnected} socket(s) with a no-longer-valid session`);
+      let disconnected = 0;
+      let validationErrors = 0;
+
+      for (const socket of sockets) {
+        const user = (socket.data as AuthenticatedSocketData).user;
+
+        if (!user) {
+          continue;
+        }
+
+        try {
+          const stillValid =
+            await this.realtimeAuth.isSessionStillValid(
+              user.sessionId,
+              user.id,
+            );
+
+          if (!stillValid) {
+            socket.disconnect(true);
+            disconnected++;
+          }
+        } catch (error: unknown) {
+          validationErrors++;
+
+          this.logger.error(
+            `Failed to validate realtime session for user ${
+              user.id
+            }: ${String(error)}`,
+          );
+        }
+      }
+
+      if (disconnected > 0) {
+        this.logger.log(
+          `Backstop sweep force-disconnected ${disconnected} socket(s) with a no-longer-valid session`,
+        );
+      }
+
+      if (validationErrors > 0) {
+        this.logger.warn(
+          `Backstop sweep encountered ${validationErrors} session validation error(s)`,
+        );
+      }
+    } catch (error: unknown) {
+      this.logger.error(
+        `Realtime stale-session sweep failed: ${String(error)}`,
+      );
     }
   }
 }
