@@ -9,7 +9,7 @@ import { describeApiError } from '@/lib/api-errors';
 import { Notice } from '@/components/ui/Notice';
 import { InstrumentCard } from './InstrumentCard';
 
-// Fallback mock items matching the exact FentiCoin markets screenshot layout
+// Fallback mock items matching the exact FentiCoin markets layout
 const MOCK_MARKETS = [
   { id: 'spk', displaySymbol: 'SPK/USDT', name: 'Spark', quoteCurrency: 'USDT', status: 'active' },
   { id: 'kat', displaySymbol: 'KAT/USDT', name: 'Katon', quoteCurrency: 'USDT', status: 'active' },
@@ -58,6 +58,7 @@ export function MarketsBrowser() {
         {/* Real / Demo Toggle Tabs */}
         <div className="mt-4 flex rounded-full bg-neutral-100 p-1">
           <button
+            type="button"
             onClick={() => setAccountType('real')}
             className={`flex-1 rounded-full py-2.5 text-xs font-bold transition ${
               accountType === 'real' ? 'bg-[#00C853] text-neutral-950 shadow-md' : 'text-neutral-500'
@@ -66,6 +67,7 @@ export function MarketsBrowser() {
             Real Account
           </button>
           <button
+            type="button"
             onClick={() => setAccountType('demo')}
             className={`flex-1 rounded-full py-2.5 text-xs font-bold transition ${
               accountType === 'demo' ? 'bg-[#00C853] text-neutral-950 shadow-md' : 'text-neutral-500'

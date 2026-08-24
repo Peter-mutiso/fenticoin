@@ -58,18 +58,6 @@ interface ErrorResponseBody {
   };
 }
 
-/**
- * Normalize the configured API base URL.
- *
- * This prevents:
- *
- *   https://fenticoin.onrender.com//markets/instruments
- *
- * when NEXT_PUBLIC_API_URL accidentally ends with "/".
- *
- * It also makes path handling predictable if a caller passes
- * a path with or without a leading slash.
- */
 function normalizeApiUrl(baseUrl: string, path: string): string {
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
   const normalizedPath = path.replace(/^\/+/, '');
@@ -144,11 +132,6 @@ async function readJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
-/**
- * Unauthenticated request.
- *
- * No bearer token is attached and 401 responses are not retried.
- */
 async function publicFetch<T>(
   path: string,
   init?: RequestInit,
@@ -168,18 +151,8 @@ async function publicFetch<T>(
   return readJson<T>(response);
 }
 
-/**
- * A refresh in flight is shared by every concurrent 401.
- *
- * This means a burst of requests that all lose their session
- * triggers exactly one /auth/refresh request.
- */
 let refreshPromise: Promise<boolean> | null = null;
 
-/**
- * Exported so the realtime socket client can proactively refresh
- * before reconnecting when its token has expired.
- */
 export async function ensureFreshSession(): Promise<boolean> {
   const refreshToken = getStoredRefreshToken();
 
@@ -222,15 +195,6 @@ async function doRefresh(refreshToken: string): Promise<boolean> {
   }
 }
 
-/**
- * Authenticated request.
- *
- * Attaches the bearer token.
- * On 401:
- *   1. Refresh the session once.
- *   2. Retry the original request once.
- *   3. If refresh fails, clear the session.
- */
 async function authedFetch<T>(
   path: string,
   init?: RequestInit,
@@ -437,10 +401,6 @@ export function disableTwoFactor(
   });
 }
 
-/**
- * Mirrors `RequestUser` in
- * apps/api/src/authorization/types/request-user.ts exactly.
- */
 export interface RequestUser {
   id: string;
   email: string;
@@ -472,10 +432,6 @@ export function getWallet(
   );
 }
 
-/**
- * Mirrors `serializeTransaction` in
- * apps/api/src/wallet/mappers.ts exactly.
- */
 export type TransactionType =
   | 'deposit'
   | 'withdrawal'
@@ -514,10 +470,6 @@ export interface Transaction {
   postedAt: string | null;
 }
 
-/**
- * No server-side type/status filter exists on this endpoint.
- * Filtering must happen client-side over the fetched page.
- */
 export function listWalletTransactions(
   params: {
     limit?: number;
@@ -536,7 +488,7 @@ export function listWalletTransactions(
 
   const suffix = query.toString()
     ? `?${query.toString()}`
-    : '';
+        : '';
 
   return authedFetch(
     `/wallet/transactions${suffix}`,
@@ -582,7 +534,7 @@ export interface PriceQuote {
   isStale: boolean;
 }
 
-export function listInstruments(
+export async function listInstruments(
   params: {
     category?: string;
   } = {},
@@ -591,9 +543,13 @@ export function listInstruments(
     ? `?category=${encodeURIComponent(params.category)}`
     : '';
 
-  return publicFetch(
-    `/markets/instruments${suffix}`,
-  );
+  const res = await publicFetch<any>(`/markets/instruments${suffix}`);
+  
+  // Safeguard against APIs that return either wrapped objects or flat arrays
+  if (Array.isArray(res)) {
+    return { items: res };
+  }
+  return { items: res?.items ?? [] };
 }
 
 export function getInstrument(
@@ -619,10 +575,6 @@ export type BetType =
   | 'higher_lower'
   | 'up_down';
 
-/**
- * Mirrors `betStatusEnum` in
- * apps/api/src/database/schema/enums.ts exactly.
- */
 export type BetStatus =
   | 'pending'
   | 'open'
@@ -639,9 +591,6 @@ export type BetResult =
   | 'loss'
   | 'push';
 
-/**
- * Terminal bet statuses.
- */
 const TERMINAL_BET_STATUSES: readonly BetStatus[] = [
   'won',
   'lost',
@@ -668,10 +617,6 @@ export interface BettingConfig {
   isEnabled: boolean;
 }
 
-/**
- * Mirrors `serializeBet` in
- * apps/api/src/betting/mappers.ts exactly.
- */
 export interface Bet {
   id: string;
   userId: string;
@@ -718,16 +663,17 @@ export interface PlaceBetInput {
   durationSeconds: number;
 }
 
-export function placeBet(
-  input: PlaceBetInput,
-  idempotencyKey: string,
-): Promise<Bet> {
+// Fixed to use authedFetch targeting the proper backend API route pattern (/betting/bets)
+export function placeBet(params: {
+  instrumentId: string;
+  type: string;
+  selection: 'rise' | 'fall';
+  stakeAmountMinorUnits: string;
+  durationSeconds: number;
+}) {
   return authedFetch('/betting/bets', {
     method: 'POST',
-    headers: {
-      'Idempotency-Key': idempotencyKey,
-    },
-    body: JSON.stringify(input),
+    body: JSON.stringify(params),
   });
 }
 
@@ -776,10 +722,6 @@ export type DepositStatus =
   | 'cancelled'
   | 'expired';
 
-/**
- * Mirrors `serializeDeposit` in
- * apps/api/src/payments/mappers.ts exactly.
- */
 export interface Deposit {
   id: string;
   userId: string;
@@ -874,10 +816,6 @@ export type WithdrawalStatus =
   | 'failed'
   | 'reversed';
 
-/**
- * Mirrors `serializeWithdrawal` in
- * apps/api/src/payments/mappers.ts exactly.
- */
 export interface Withdrawal {
   id: string;
   userId: string;
@@ -949,9 +887,6 @@ export function getWithdrawal(
   );
 }
 
-/**
- * Terminal statuses for withdrawals.
- */
 const TERMINAL_WITHDRAWAL_STATUSES: readonly WithdrawalStatus[] = [
   'completed',
   'failed',
@@ -965,9 +900,6 @@ export function isTerminalWithdrawalStatus(
   return TERMINAL_WITHDRAWAL_STATUSES.includes(status);
 }
 
-/**
- * Terminal statuses for deposits.
- */
 const TERMINAL_DEPOSIT_STATUSES: readonly DepositStatus[] = [
   'completed',
   'failed',

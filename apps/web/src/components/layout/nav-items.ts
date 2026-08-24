@@ -1,4 +1,4 @@
-import { Briefcase, Clock, Home, LineChart, Receipt, TrendingUp, User, type LucideIcon } from 'lucide-react';
+import { Bot, Briefcase, Clock, Home, LineChart, Receipt, TrendingUp, User, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   id: string;
@@ -13,7 +13,8 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Home', icon: Home, href: '/dashboard' },
   { id: 'markets', label: 'Markets', icon: TrendingUp, href: '/markets' },
-  { id: 'trade', label: 'Trade', icon: LineChart, primary: true, href: '/dashboard' },
+  { id: 'trade', label: 'Trade', icon: LineChart, primary: true, href: '/trade' },
+  { id: 'bot', label: 'Bot', icon: Bot, href: '/bot' },
   { id: 'portfolio', label: 'Portfolio', icon: Briefcase, href: '/portfolio' },
   { id: 'history', label: 'History', icon: Clock, href: '/bet-history' },
   { id: 'transactions', label: 'Transactions', icon: Receipt, href: '/transactions' },
