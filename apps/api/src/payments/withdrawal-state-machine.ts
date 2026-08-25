@@ -13,6 +13,7 @@ const LEGAL_TRANSITIONS: Record<WithdrawalStatus, WithdrawalStatus[]> = {
   pending_review: ['approved', 'rejected'],
   approved: ['submitted', 'failed'],
   submitted: ['completed', 'failed'],
+  unknown: ['submitted', 'completed', 'failed'],
   completed: ['reversed'],
   rejected: [],
   failed: [],

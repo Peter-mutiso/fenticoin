@@ -4,6 +4,19 @@ import { AuditLogService } from './audit-log.service';
 
 describe('AuditLogService', () => {
   describe('record', () => {
+    it('writes through the supplied transaction client', async () => {
+      const rootValues = jest.fn().mockReturnValue(Promise.resolve());
+      const txValues = jest.fn().mockReturnValue(Promise.resolve());
+      const db = { insert: jest.fn().mockReturnValue({ values: rootValues }) } as unknown as DrizzleDb;
+      const tx = { insert: jest.fn().mockReturnValue({ values: txValues }) } as unknown as DrizzleDb;
+      const service = new AuditLogService(db);
+
+      await service.record({ actorUserId: null, actorType: 'system', action: 'financial.change' }, tx);
+
+      expect(txValues).toHaveBeenCalled();
+      expect(rootValues).not.toHaveBeenCalled();
+    });
+
     it('inserts a row with the actor/action/target/before/after shape', async () => {
       const values = jest.fn().mockReturnValue(Promise.resolve());
       const db = { insert: jest.fn().mockReturnValue({ values }) } as unknown as DrizzleDb;

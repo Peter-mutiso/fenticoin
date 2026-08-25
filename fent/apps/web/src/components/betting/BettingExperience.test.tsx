@@ -24,7 +24,7 @@ export function BettingExperience() {
   const [dialogError, setDialogError] = useState<string | null>(null);
 
   // Queries
-  const instrumentsQuery = useQuery({ queryKey: ['instruments'], queryFn: listInstruments });
+  const instrumentsQuery = useQuery({ queryKey: ['instruments'], queryFn: () => listInstruments() });
   const instruments = instrumentsQuery.data?.items ?? [];
 
   const priceQuery = useQuery({

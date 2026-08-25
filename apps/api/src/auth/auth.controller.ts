@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req, Res, UnauthorizedException } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
 import { CurrentUser } from '../authorization/decorators/current-user.decorator';
@@ -59,7 +59,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
   refresh(@Body() dto: RefreshDto, @Req() req: Request): Promise<AuthResult> {
-    return this.authService.refresh(dto.refreshToken, metaFromRequest(req));
+    const refreshToken = dto.refreshToken ?? readCookie(req, 'fenticoin_refresh_token');
+    if (!refreshToken) throw new UnauthorizedException('Refresh token is required');
+    return this.authService.refresh(refreshToken, metaFromRequest(req));
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -149,9 +151,16 @@ export class AuthController {
     @Res() res: Response,
   ): Promise<void> {
     const result = await this.authService.handleGoogleCallback(code, state, metaFromRequest(req));
-    const redirectUrl = new URL('/oauth/callback', this.config.appBaseUrl);
-    redirectUrl.searchParams.set('accessToken', result.accessToken);
-    redirectUrl.searchParams.set('refreshToken', result.refreshToken);
-    res.redirect(redirectUrl.toString());
+    const secure = this.config.isProduction;
+    res.cookie('fenticoin_access_token', result.accessToken, { httpOnly: true, secure, sameSite: 'lax', path: '/', maxAge: this.config.accessTokenTtlSeconds * 1000 });
+    res.cookie('fenticoin_refresh_token', result.refreshToken, { httpOnly: true, secure, sameSite: 'lax', path: '/', maxAge: this.config.refreshTokenTtlDays * 24 * 60 * 60 * 1000 });
+    res.redirect(new URL('/dashboard', this.config.appBaseUrl).toString());
   }
+}
+
+function readCookie(req: Request, name: string): string | undefined {
+  const header = req.headers.cookie;
+  if (!header) return undefined;
+  const value = header.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${name}=`));
+  return value ? decodeURIComponent(value.slice(name.length + 1)) : undefined;
 }

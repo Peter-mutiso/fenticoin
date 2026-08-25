@@ -4,33 +4,22 @@ import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { listInstruments, listMarketCategories } from '@/lib/api-client';
+import { listInstruments } from '@/lib/api-client';
 import { describeApiError } from '@/lib/api-errors';
 import { Notice } from '@/components/ui/Notice';
 import { InstrumentCard } from './InstrumentCard';
-
-// Fallback mock items matching the exact FentiCoin markets layout
-const MOCK_MARKETS = [
-  { id: 'spk', displaySymbol: 'SPK/USDT', name: 'Spark', quoteCurrency: 'USDT', status: 'active' },
-  { id: 'kat', displaySymbol: 'KAT/USDT', name: 'Katon', quoteCurrency: 'USDT', status: 'active' },
-  { id: 'zec', displaySymbol: 'ZEC/USDT', name: 'Zcash', quoteCurrency: 'USDT', status: 'active' },
-  { id: 'doge', displaySymbol: 'DOGE/USDT', name: 'Dogecoin', quoteCurrency: 'USDT', status: 'active' },
-  { id: 'usdc', displaySymbol: 'USDC/USDT', name: 'USD Coin', quoteCurrency: 'USDT', status: 'active' },
-  { id: 'rlusd', displaySymbol: 'RLUSD/USDT', name: 'Ripple USD', quoteCurrency: 'USDT', status: 'active' },
-];
 
 export function MarketsBrowser() {
   const [search, setSearch] = useState('');
   const [accountType, setAccountType] = useState<'real' | 'demo'>('real');
 
-  const categoriesQuery = useQuery({ queryKey: ['market-categories'], queryFn: listMarketCategories });
   const instrumentsQuery = useQuery({
     queryKey: ['instruments'],
     queryFn: () => listInstruments(),
   });
 
   const instruments = instrumentsQuery.data?.items?.filter((i) => i.status === 'active') ?? [];
-  const displayList = instruments.length > 0 ? instruments : MOCK_MARKETS;
+  const displayList = instruments;
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -79,21 +68,19 @@ export function MarketsBrowser() {
 
         <div className="mt-5 flex items-baseline justify-between">
           <span className="text-xs text-neutral-400">Current Balance</span>
-          <span className="text-2xl font-extrabold text-neutral-950">
-            {accountType === 'real' ? '$100.82' : '$10,000.00'}
-          </span>
+          <span className="text-2xl font-extrabold text-neutral-950">Unavailable</span>
         </div>
 
         {/* Action Buttons: Green Deposit & Red Withdraw */}
         <div className="mt-5 grid grid-cols-2 gap-3">
           <a
-            href="/deposit"
+            href="/account/deposit"
             className="flex items-center justify-center rounded-2xl bg-[#00C853] py-3.5 text-sm font-bold text-neutral-950 shadow-lg shadow-emerald-500/20 transition hover:bg-[#00b048]"
           >
             Deposit
           </a>
           <a
-            href="/withdraw"
+            href="/account/withdraw"
             className="flex items-center justify-center rounded-2xl bg-[#ff2d55] py-3.5 text-sm font-bold text-white shadow-lg shadow-rose-500/20 transition hover:bg-[#e0264a]"
           >
             Withdraw
@@ -127,9 +114,11 @@ export function MarketsBrowser() {
 
       {/* Markets List Rows */}
       <div className="space-y-3">
-        {filtered.map((instrument) => (
-          <InstrumentCard key={instrument.id} instrument={instrument as any} />
-        ))}
+        {instrumentsQuery.isPending ? (
+          <p className="text-sm text-neutral-500">Loading instruments...</p>
+        ) : filtered.length > 0 ? filtered.map((instrument) => (
+          <InstrumentCard key={instrument.id} instrument={instrument} />
+        )) : !instrumentsQuery.error && <Notice text="No instruments available right now." />}
       </div>
     </div>
   );

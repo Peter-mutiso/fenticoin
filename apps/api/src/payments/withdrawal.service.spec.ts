@@ -7,6 +7,7 @@ import { InsufficientFundsError } from '../wallet/errors';
 import type { TransactionService } from '../wallet/transaction.service';
 import { chainable, type ChainableMock } from '../test-utils/mock-drizzle';
 import type { PaymentService } from './payment.service';
+import { PaymentProviderSubmissionError } from './providers/payment-provider.interface';
 import type { UsersService } from '../users/users.service';
 import { WithdrawalEligibilityService } from './withdrawal-eligibility.service';
 import { WithdrawalService } from './withdrawal.service';
@@ -197,7 +198,7 @@ describe('WithdrawalService', () => {
       const h = makeHarness();
       h.db.select.mockReturnValueOnce(chainable([withdrawalRow()]));
       h.db.update.mockReturnValueOnce(updateReturning([withdrawalRow({ status: 'approved' })]));
-      h.paymentService.createWithdrawal.mockRejectedValue(new Error('provider network error'));
+      h.paymentService.createWithdrawal.mockRejectedValue(new PaymentProviderSubmissionError('rejected', 'rejected'));
       h.tx.update
         .mockReturnValueOnce(updateReturning([withdrawalRow({ status: 'failed', failureReason: 'submission failed' })]))
         .mockReturnValueOnce(updateReturning([withdrawalRow({ status: 'failed', releaseTransactionId: 'release-txn-1' })]));
@@ -206,6 +207,20 @@ describe('WithdrawalService', () => {
 
       expect(result.status).toBe('failed');
       expect(h.transactionService.releaseWithdrawalHold).toHaveBeenCalled();
+    });
+
+    it('keeps funds held when the provider response is ambiguous', async () => {
+      const h = makeHarness();
+      h.db.select.mockReturnValueOnce(chainable([withdrawalRow()]));
+      h.db.update.mockReturnValueOnce(updateReturning([withdrawalRow({ status: 'approved' })]));
+      h.paymentService.createWithdrawal.mockRejectedValue(new Error('response lost after submission'));
+      h.db.update.mockReturnValueOnce(updateReturning([withdrawalRow({ status: 'unknown', failureReason: 'ambiguous' })]));
+
+      const result = await h.service.reviewWithdrawal('wd-1', 'approve', 'admin-1');
+
+      expect(result.status).toBe('unknown');
+      expect(h.transactionService.releaseWithdrawalHold).not.toHaveBeenCalled();
+      expect(h.paymentService.createWithdrawal).toHaveBeenCalledTimes(1);
     });
 
     it('refuses to review a withdrawal that is not pending review', async () => {
@@ -280,6 +295,21 @@ describe('WithdrawalService', () => {
 
       const { withdrawal } = await h.service.verifyAndSettleWithdrawal('wref-1');
       expect(withdrawal.status).toBe('failed');
+      expect(h.transactionService.settleWithdrawal).not.toHaveBeenCalled();
+    });
+
+    it('fails and releases the withdrawal when independently verified currency does not match', async () => {
+      const h = makeHarness();
+      h.db.select.mockReturnValueOnce(chainable([withdrawalRow({ status: 'submitted', providerReference: 'wref-1', amount: 5_000n, currency: 'USD' })]));
+      h.paymentService.verifyWithdrawal.mockResolvedValue({ status: 'completed', amountMinorUnits: 5_000n, currency: 'EUR' });
+      h.tx.update
+        .mockReturnValueOnce(updateReturning([withdrawalRow({ status: 'failed' })]))
+        .mockReturnValueOnce(updateReturning([withdrawalRow({ status: 'failed', releaseTransactionId: 'release-txn-1' })]));
+
+      const { withdrawal } = await h.service.verifyAndSettleWithdrawal('wref-1');
+
+      expect(withdrawal.status).toBe('failed');
+      expect(h.transactionService.releaseWithdrawalHold).toHaveBeenCalled();
       expect(h.transactionService.settleWithdrawal).not.toHaveBeenCalled();
     });
   });

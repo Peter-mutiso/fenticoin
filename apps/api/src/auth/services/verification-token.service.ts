@@ -93,10 +93,13 @@ export class VerificationTokenService {
       return undefined;
     }
 
-    await this.db
+    const consumed = await this.db
       .update(verificationTokens)
       .set({ consumedAt: new Date() })
-      .where(eq(verificationTokens.id, record.id));
+      .where(and(eq(verificationTokens.id, record.id), isNull(verificationTokens.consumedAt)))
+      .returning({ id: verificationTokens.id });
+
+    if (!consumed?.[0]) return undefined;
 
     return record.userId;
   }
@@ -128,10 +131,13 @@ export class VerificationTokenService {
     if (!record) return undefined;
     if (record.expiresAt.getTime() < Date.now()) return undefined;
 
-    await this.db
+    const consumed = await this.db
       .update(verificationTokens)
       .set({ consumedAt: new Date() })
-      .where(eq(verificationTokens.id, record.id));
+      .where(and(eq(verificationTokens.id, record.id), isNull(verificationTokens.consumedAt)))
+      .returning({ id: verificationTokens.id });
+
+    if (!consumed?.[0]) return undefined;
 
     return { userId: record.userId, identifier: record.identifier };
   }

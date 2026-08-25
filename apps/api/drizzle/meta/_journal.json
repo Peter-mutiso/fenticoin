@@ -43,6 +43,27 @@
       "when": 1787294150369,
       "tag": "0005_right_ironclad",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787657052821,
+      "tag": "0006_even_pride",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787657160709,
+      "tag": "0007_absurd_zeigeist",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787660134640,
+      "tag": "0008_empty_raider",
+      "breakpoints": true
     }
   ]
 }

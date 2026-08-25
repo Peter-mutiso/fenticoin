@@ -15,7 +15,7 @@ export function TradingBotPanel() {
   const [stopLoss, setStopLoss] = useState('20');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const instrumentsQuery = useQuery({ queryKey: ['instruments'], queryFn: listInstruments });
+  const instrumentsQuery = useQuery({ queryKey: ['instruments'], queryFn: () => listInstruments() });
   const instruments = instrumentsQuery.data?.items ?? [];
 
   // Simulated automated loop runner

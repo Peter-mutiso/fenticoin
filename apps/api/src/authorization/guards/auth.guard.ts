@@ -48,7 +48,7 @@ export class AuthGuard implements CanActivate {
     if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest<Request & { user?: RequestUser }>();
-    const token = extractBearerToken(request.headers.authorization);
+    const token = extractBearerToken(request.headers.authorization) ?? readCookie(request, 'fenticoin_access_token');
     if (!token) throw new UnauthorizedException('Missing bearer token');
 
     const payload = this.tokenService.verifyAccessToken(token);
@@ -92,4 +92,11 @@ export class AuthGuard implements CanActivate {
 function extractBearerToken(header: string | undefined): string | undefined {
   if (!header?.startsWith('Bearer ')) return undefined;
   return header.slice('Bearer '.length).trim() || undefined;
+}
+
+function readCookie(request: Request, name: string): string | undefined {
+  const header = request.headers.cookie;
+  if (!header) return undefined;
+  const value = header.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${name}=`));
+  return value ? decodeURIComponent(value.slice(name.length + 1)) : undefined;
 }

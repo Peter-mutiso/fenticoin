@@ -445,12 +445,13 @@ export class AuthService {
 
     if (!row) return false;
 
-    await this.db
+    const consumed = await this.db
       .update(twoFactorBackupCodes)
       .set({ usedAt: new Date() })
-      .where(eq(twoFactorBackupCodes.id, row.id));
+      .where(and(eq(twoFactorBackupCodes.id, row.id), isNull(twoFactorBackupCodes.usedAt)))
+      .returning({ id: twoFactorBackupCodes.id });
 
-    return true;
+    return Boolean(consumed?.[0]);
   }
 
   // ---- Google OAuth --------------------------------------------------------

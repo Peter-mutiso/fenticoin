@@ -40,7 +40,7 @@ describe('VerificationTokenService', () => {
       attempts: 0,
     };
     const select = jest.fn().mockReturnValue(chainable([record]));
-    const updateChain = chainable(undefined);
+    const updateChain = chainable([{ id: 'tok-1' }]);
     const update = jest.fn().mockReturnValue(updateChain);
     const db = { select, update } as unknown as DrizzleDb;
     const service = new VerificationTokenService(db, makeTokenService());
@@ -59,7 +59,7 @@ describe('VerificationTokenService', () => {
       attempts: 0,
     };
     const select = jest.fn().mockReturnValue(chainable([record]));
-    const updateChain = chainable(undefined);
+    const updateChain = chainable([{ id: 'tok-1' }]);
     const update = jest.fn().mockReturnValue(updateChain);
     const db = { select, update } as unknown as DrizzleDb;
     const service = new VerificationTokenService(db, makeTokenService());
@@ -67,6 +67,16 @@ describe('VerificationTokenService', () => {
     const result = await service.verify('phone_otp', '+14155551234', 'raw-token');
     expect(result).toBe('user-1');
     expect(updateChain.set).toHaveBeenCalledWith(expect.objectContaining({ consumedAt: expect.any(Date) }));
+  });
+
+  it('rejects a matching token when another request consumed it first', async () => {
+    const record = { id: 'tok-1', userId: 'user-1', tokenHash: 'hash-of-raw-token', expiresAt: new Date(Date.now() + 60_000), attempts: 0 };
+    const select = jest.fn().mockReturnValue(chainable([record]));
+    const update = jest.fn().mockReturnValue(chainable([]));
+    const db = { select, update } as unknown as DrizzleDb;
+    const service = new VerificationTokenService(db, makeTokenService());
+
+    await expect(service.verify('phone_otp', '+14155551234', 'raw-token')).resolves.toBeUndefined();
   });
 
   it('verify() rejects an expired token', async () => {

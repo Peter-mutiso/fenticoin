@@ -13,7 +13,7 @@ import {
 } from '@/lib/api-client';
 import type { PublicUser } from '@/types/auth';
 import { isTwoFactorChallenge } from '@/types/auth';
-import { clearSession, getStoredAccessToken, getStoredUser, storeSession } from './token-storage';
+import { clearSession, getStoredUser, storeSession } from './token-storage';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -61,12 +61,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function hydrate() {
       setHydrationError(null);
-      const token = getStoredAccessToken();
-      if (!token) {
-        if (!cancelled) setStatus('unauthenticated');
-        return;
-      }
-
       const cachedUser = getStoredUser();
       if (cachedUser && !cancelled) setUser(cachedUser);
 

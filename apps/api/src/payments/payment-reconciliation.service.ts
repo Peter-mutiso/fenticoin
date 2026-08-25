@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 
 import { DRIZZLE_CLIENT } from '../database/database.constants';
 import type { DrizzleDb } from '../database/database.types';
@@ -67,7 +67,7 @@ export class PaymentReconciliationService {
     const submitted = await this.db
       .select({ id: withdrawals.id, providerName: withdrawals.providerName, providerReference: withdrawals.providerReference })
       .from(withdrawals)
-      .where(and(eq(withdrawals.status, 'submitted'), isNotNull(withdrawals.providerReference)));
+      .where(and(inArray(withdrawals.status, ['submitted', 'unknown']), isNotNull(withdrawals.providerReference)));
 
     const summary: PaymentReconciliationSummary = { checked: 0, resolved: 0, stillPending: 0, errors: 0 };
 
@@ -77,7 +77,7 @@ export class PaymentReconciliationService {
       try {
         const { withdrawal, wasAlreadyResolved } = await this.withdrawalService.verifyAndSettleWithdrawal(row.providerReference);
         if (wasAlreadyResolved) continue;
-        if (withdrawal.status === 'submitted') {
+        if (withdrawal.status === 'submitted' || withdrawal.status === 'unknown') {
           summary.stillPending += 1;
         } else {
           summary.resolved += 1;

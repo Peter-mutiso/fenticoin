@@ -7,7 +7,7 @@ import { type AuditLog, auditLogs } from '../database/schema';
 
 export interface RecordAuditEventInput {
   actorUserId: string | null;
-  actorType?: 'user' | 'system';
+  actorType?: 'user' | 'admin' | 'system';
   action: string;
   targetType?: string;
   targetId?: string;
@@ -38,8 +38,8 @@ export interface ListAuditLogsFilters {
 export class AuditLogService {
   constructor(@Inject(DRIZZLE_CLIENT) private readonly db: DrizzleDb) {}
 
-  async record(event: RecordAuditEventInput): Promise<void> {
-    await this.db.insert(auditLogs).values({
+  async record(event: RecordAuditEventInput, tx?: DrizzleDb): Promise<void> {
+    await (tx ?? this.db).insert(auditLogs).values({
       actorUserId: event.actorUserId,
       actorType: event.actorType ?? 'user',
       action: event.action,

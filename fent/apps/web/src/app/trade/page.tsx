@@ -26,7 +26,7 @@ export default function TradePage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Queries
-  const instrumentsQuery = useQuery({ queryKey: ['instruments'], queryFn: listInstruments });
+  const instrumentsQuery = useQuery({ queryKey: ['instruments'], queryFn: () => listInstruments() });
   const instruments = instrumentsQuery.data?.items ?? [];
 
   const selectedInstrument = instruments.find((i) => i.id === selectedInstrumentId);

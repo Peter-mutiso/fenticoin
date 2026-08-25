@@ -96,6 +96,7 @@ async function rawFetch(
 
     return await fetch(url, {
       ...init,
+      credentials: 'include',
       signal: controller.signal,
     });
   } catch {
@@ -664,15 +665,10 @@ export interface PlaceBetInput {
 }
 
 // Fixed to use authedFetch targeting the proper backend API route pattern (/betting/bets)
-export function placeBet(params: {
-  instrumentId: string;
-  type: string;
-  selection: 'rise' | 'fall';
-  stakeAmountMinorUnits: string;
-  durationSeconds: number;
-}) {
+export function placeBet(params: PlaceBetInput, idempotencyKey?: string): Promise<Bet> {
   return authedFetch('/betting/bets', {
     method: 'POST',
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
     body: JSON.stringify(params),
   });
 }
@@ -705,6 +701,31 @@ export function listBets(
   return authedFetch(
     `/betting/bets${suffix}`,
   );
+}
+
+// ---- bots --------------------------------------------------------------
+
+export type BotStatus = 'inactive' | 'active' | 'strategy_unconfigured';
+
+export interface Bot {
+  id: string;
+  userId: string;
+  status: BotStatus;
+  strategyKey: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function getBot(): Promise<Bot> {
+  return authedFetch('/bots/me');
+}
+
+export function activateBot(): Promise<Bot> {
+  return authedFetch('/bots/me/activate', { method: 'POST' });
+}
+
+export function deactivateBot(): Promise<Bot> {
+  return authedFetch('/bots/me/deactivate', { method: 'POST' });
 }
 
 export function getBet(
@@ -812,6 +833,7 @@ export type WithdrawalStatus =
   | 'approved'
   | 'rejected'
   | 'submitted'
+  | 'unknown'
   | 'completed'
   | 'failed'
   | 'reversed';

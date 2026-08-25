@@ -71,14 +71,38 @@ export class SessionService {
       return { outcome: 'invalid' };
     }
 
-    const { session: next, refreshTokenRaw: nextRaw } = await this.createSession(session.userId, meta);
+    const { raw: nextRaw, hash: nextHash } = this.tokenService.generateOpaqueToken();
+    const expiresAt = new Date(Date.now() + this.config.refreshTokenTtlDays * 24 * 60 * 60 * 1000);
 
-    await this.db
-      .update(sessions)
-      .set({ revokedAt: new Date(), revokedReason: 'rotated', replacedBySessionId: next.id })
-      .where(eq(sessions.id, session.id));
+    const result = await this.db.transaction(async (tx) => {
+      const [claimed] = await tx
+        .update(sessions)
+        .set({ revokedAt: new Date(), revokedReason: 'rotated' })
+        .where(and(eq(sessions.id, session.id), isNull(sessions.revokedAt)))
+        .returning();
+      if (!claimed) return undefined;
 
-    return { outcome: 'rotated', session: next, refreshTokenRaw: nextRaw };
+      const [next] = await tx
+        .insert(sessions)
+        .values({ userId: session.userId, refreshTokenHash: nextHash, userAgent: meta.userAgent, ipAddress: meta.ipAddress, expiresAt })
+        .returning();
+      if (!next) throw new Error('Failed to create rotated session');
+
+      const [linked] = await tx
+        .update(sessions)
+        .set({ replacedBySessionId: next.id })
+        .where(eq(sessions.id, session.id))
+        .returning();
+      if (!linked) throw new Error('Failed to link rotated session');
+      return next;
+    });
+
+    if (!result) {
+      await this.revokeAllForUser(session.userId, 'rotation_reuse_detected');
+      return { outcome: 'reused' };
+    }
+
+    return { outcome: 'rotated', session: result, refreshTokenRaw: nextRaw };
   }
 
   async revoke(sessionId: string, reason: SessionRevokedReason): Promise<void> {

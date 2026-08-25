@@ -1,49 +1,21 @@
-import { Injectable } from '@nestjs/common';
-
 import { ProviderNotConfiguredError } from '../../auth/providers/provider-not-configured.error';
-import type {
-  DepositIntent,
-  PaymentProvider,
-  PaymentProviderWebhookEvent,
-  PaymentVerificationResult,
-  WithdrawalResult,
-} from './payment-provider.interface';
+import { UnconfiguredPaymentProvider } from './unconfigured-payment.provider';
 
-/**
- * The only PaymentProvider implementation until the client's chosen
- * vendor is integrated.
- *
- * Every method fails explicitly. There is no fake/dev payment success.
- */
-@Injectable()
-export class UnconfiguredPaymentProvider implements PaymentProvider {
-  readonly name = 'Payments (unconfigured)';
+describe('UnconfiguredPaymentProvider', () => {
+  it('reports that no provider is configured', () => {
+    const provider = new UnconfiguredPaymentProvider();
 
-  isConfigured(): boolean {
-    return false;
-  }
+    expect(provider.isConfigured()).toBe(false);
+    expect(provider.name).toBe('Payments (unconfigured)');
+  });
 
-  async createDeposit(): Promise<DepositIntent> {
-    await Promise.resolve();
-    throw new ProviderNotConfiguredError('Payment provider');
-  }
+  it('fails every provider operation explicitly', async () => {
+    const provider = new UnconfiguredPaymentProvider();
 
-  async createWithdrawal(): Promise<WithdrawalResult> {
-    await Promise.resolve();
-    throw new ProviderNotConfiguredError('Payment provider');
-  }
-
-  parseWebhookEvent(): PaymentProviderWebhookEvent {
-    throw new ProviderNotConfiguredError('Payment provider');
-  }
-
-  async verifyDeposit(): Promise<PaymentVerificationResult> {
-    await Promise.resolve();
-    throw new ProviderNotConfiguredError('Payment provider');
-  }
-
-  async verifyWithdrawal(): Promise<PaymentVerificationResult> {
-    await Promise.resolve();
-    throw new ProviderNotConfiguredError('Payment provider');
-  }
-}
+    await expect(provider.createDeposit()).rejects.toThrow(ProviderNotConfiguredError);
+    await expect(provider.createWithdrawal()).rejects.toThrow(ProviderNotConfiguredError);
+    expect(() => provider.parseWebhookEvent()).toThrow(ProviderNotConfiguredError);
+    await expect(provider.verifyDeposit()).rejects.toThrow(ProviderNotConfiguredError);
+    await expect(provider.verifyWithdrawal()).rejects.toThrow(ProviderNotConfiguredError);
+  });
+});

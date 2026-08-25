@@ -34,7 +34,7 @@ export const sessionRevokedReasonEnum = pgEnum('session_revoked_reason', [
 ]);
 export type SessionRevokedReason = (typeof sessionRevokedReasonEnum.enumValues)[number];
 
-export const auditActorTypeEnum = pgEnum('audit_actor_type', ['user', 'system']);
+export const auditActorTypeEnum = pgEnum('audit_actor_type', ['user', 'admin', 'system']);
 
 // ---- wallet / ledger --------------------------------------------------
 
@@ -131,6 +131,7 @@ export const withdrawalStatusEnum = pgEnum('withdrawal_status', [
   'approved',
   'rejected',
   'submitted',
+  'unknown',
   'completed',
   'failed',
   'reversed',

@@ -295,12 +295,12 @@ export class DepositService {
 
       await this.auditLog.record({
         actorUserId,
-        actorType: actorUserId ? 'user' : 'system',
+        actorType: actorUserId ? 'admin' : 'system',
         action: 'deposit.completed',
         targetType: 'deposit',
         targetId: claimed.id,
         after: { amount: claimed.amount.toString(), currency: claimed.currency, transactionId: ledgerTx.id },
-      });
+      }, t);
 
       return linked;
     }).then((linked) => {
@@ -323,7 +323,7 @@ export class DepositService {
     if (updated) {
       await this.auditLog.record({
         actorUserId,
-        actorType: actorUserId ? 'user' : 'system',
+        actorType: actorUserId ? 'admin' : 'system',
         action: 'deposit.failed',
         targetType: 'deposit',
         targetId: deposit.id,

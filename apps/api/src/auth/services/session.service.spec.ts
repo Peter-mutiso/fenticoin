@@ -74,7 +74,13 @@ describe('SessionService', () => {
       );
     const insert = jest.fn().mockReturnValue(chainable([{ id: 's2', userId: 'u1' }]));
     const update = jest.fn().mockReturnValue(chainable(undefined));
-    const db = { select, insert, update } as unknown as DrizzleDb;
+    const tx = {
+      update: jest.fn()
+        .mockReturnValueOnce(chainable([{ id: 's1', userId: 'u1' }]))
+        .mockReturnValueOnce(chainable([{ id: 's1', userId: 'u1' }])),
+      insert: jest.fn().mockReturnValue(chainable([{ id: 's2', userId: 'u1' }])),
+    };
+    const db = { select, insert, update, transaction: jest.fn(async (callback: (value: typeof tx) => unknown) => callback(tx)) } as unknown as DrizzleDb;
     const service = new SessionService(db, makeTokenService(), config, events);
 
     const result = await service.rotate('raw', {});
@@ -82,6 +88,16 @@ describe('SessionService', () => {
     if (result.outcome === 'rotated') {
       expect(result.session.id).toBe('s2');
     }
-    expect(update).toHaveBeenCalled();
+    expect(tx.update).toHaveBeenCalled();
+  });
+
+  it('returns reuse when a concurrent rotation claims the session first', async () => {
+    const select = jest.fn().mockReturnValue(chainable([{ id: 's1', userId: 'u1', revokedAt: null, expiresAt: new Date(Date.now() + 1000) }]));
+    const tx = { update: jest.fn().mockReturnValue(chainable([])), insert: jest.fn() };
+    const db = { select, transaction: jest.fn(async (callback: (value: typeof tx) => unknown) => callback(tx)), update: jest.fn().mockReturnValue(chainable(undefined)) } as unknown as DrizzleDb;
+    const service = new SessionService(db, makeTokenService(), config, events);
+
+    await expect(service.rotate('raw', {})).resolves.toEqual({ outcome: 'reused' });
+    expect(tx.insert).not.toHaveBeenCalled();
   });
 });

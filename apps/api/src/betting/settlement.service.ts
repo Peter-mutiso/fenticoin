@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
@@ -68,11 +70,11 @@ export class SettlementService {
     }
 
     try {
-      const settled = await this.process(claimed);
+      const settled = await this.process(claimed, claimed.settlementClaimToken!);
       this.emitBetEvent(settled);
       return settled;
     } catch (error) {
-      await this.handleSettlementFailure(claimed, error);
+      await this.handleSettlementFailure(claimed, claimed.settlementClaimToken! , error);
       throw error;
     }
   }
@@ -82,7 +84,7 @@ export class SettlementService {
     const cutoff = new Date(Date.now() - STUCK_CLAIM_GRACE_SECONDS * 1000);
     const released = await this.db
       .update(bets)
-      .set({ status: 'open', updatedAt: new Date() })
+      .set({ status: 'open', settlementClaimToken: null, updatedAt: new Date() })
       .where(and(eq(bets.status, 'pending'), lt(bets.updatedAt, cutoff)))
       .returning({ id: bets.id });
     if (released.length > 0) {
@@ -151,7 +153,7 @@ export class SettlementService {
         targetType: 'bet',
         targetId: betId,
         after: { reason },
-      });
+      }, tx as unknown as DrizzleDb);
 
       return final;
     }).then((final) => {
@@ -345,7 +347,7 @@ export class SettlementService {
         targetId: betId,
         before: { status: 'requires_review' },
         after: { status: targetStatus, resolution, reason },
-      });
+      }, t);
 
       return updated;
     }).then((updated) => {
@@ -362,9 +364,10 @@ export class SettlementService {
   }
 
   private async claim(betId: string): Promise<Bet | undefined> {
+    const settlementClaimToken = randomUUID();
     const [claimed] = await this.db
       .update(bets)
-      .set({ status: 'pending', updatedAt: new Date() })
+      .set({ status: 'pending', settlementClaimToken, updatedAt: new Date() })
       .where(and(eq(bets.id, betId), eq(bets.status, 'open')))
       .returning();
     return claimed;
@@ -381,7 +384,7 @@ export class SettlementService {
    * the scheduler retry it forever, every 5 seconds, without ever
    * surfacing that anything is wrong.
    */
-  private async handleSettlementFailure(bet: Bet, error: unknown): Promise<void> {
+  private async handleSettlementFailure(bet: Bet, settlementClaimToken: string, error: unknown): Promise<void> {
     const priorFailures = await this.countFailedAttempts(bet.id);
     const attempt = priorFailures + 1;
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -395,8 +398,8 @@ export class SettlementService {
 
     const [updated] = await this.db
       .update(bets)
-      .set({ status: nextStatus, updatedAt: new Date() })
-      .where(and(eq(bets.id, bet.id), eq(bets.status, 'pending')))
+      .set({ status: nextStatus, settlementClaimToken: null, updatedAt: new Date() })
+      .where(and(eq(bets.id, bet.id), eq(bets.status, 'pending'), eq(bets.settlementClaimToken, settlementClaimToken)))
       .returning();
 
     await this.recordAudit(this.db, {
@@ -437,7 +440,7 @@ export class SettlementService {
     return Number(row?.total ?? 0);
   }
 
-  private async process(bet: Bet): Promise<Bet> {
+  private async process(bet: Bet, settlementClaimToken: string): Promise<Bet> {
     // Authoritative settlement price for the bet's expiry instant — never
     // client-supplied, and never "whatever the price is right now" (see
     // PriceFeedService.getPriceForSettlement). Throws on a stale or
@@ -470,7 +473,7 @@ export class SettlementService {
           },
           t,
         );
-        return this.finalize(t, bet, 'won', result, settlementQuote, ledgerTx.id);
+        return this.finalize(t, bet, settlementClaimToken, 'won', result, settlementQuote, ledgerTx.id);
       }
 
       if (result === 'loss') {
@@ -486,7 +489,7 @@ export class SettlementService {
           },
           t,
         );
-        return this.finalize(t, bet, 'lost', result, settlementQuote, ledgerTx.id);
+        return this.finalize(t, bet, settlementClaimToken, 'lost', result, settlementQuote, ledgerTx.id);
       }
 
       const ledgerTx = await this.transactionService.refundBet(
@@ -502,13 +505,14 @@ export class SettlementService {
         },
         t,
       );
-      return this.finalize(t, bet, 'void', result, settlementQuote, ledgerTx.id);
+      return this.finalize(t, bet, settlementClaimToken, 'void', result, settlementQuote, ledgerTx.id);
     });
   }
 
   private async finalize(
     tx: DrizzleDb,
     bet: Bet,
+    settlementClaimToken: string,
     status: 'won' | 'lost' | 'void',
     result: 'win' | 'loss' | 'push',
     settlementQuote: PriceQuote,
@@ -525,9 +529,10 @@ export class SettlementService {
         settlementPriceObservedAt: settlementQuote.observedAt,
         settledAt: new Date(),
         settlementTransactionId,
+        settlementClaimToken: null,
         updatedAt: new Date(),
       })
-      .where(eq(bets.id, bet.id))
+      .where(and(eq(bets.id, bet.id), eq(bets.status, 'pending'), eq(bets.settlementClaimToken, settlementClaimToken)))
       .returning();
     if (!settled) throw new Error('Failed to finalize bet settlement');
 

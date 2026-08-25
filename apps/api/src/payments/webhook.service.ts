@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 
-import { Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, NotImplementedException, UnauthorizedException } from '@nestjs/common';
 
+import { ProviderNotConfiguredError } from '../auth/providers/provider-not-configured.error';
 import { DepositService } from './deposit.service';
 import { PaymentService } from './payment.service';
 import type { PaymentWebhookOutcome } from '../database/schema';
@@ -42,6 +43,18 @@ export class WebhookService {
     try {
       event = this.paymentService.parseWebhookEvent(rawBody, signatureHeader);
     } catch (error) {
+      if (error instanceof ProviderNotConfiguredError || error instanceof NotImplementedException) {
+        await this.receiptService.record({
+          providerName,
+          rawBodyHash,
+          signatureValid: false,
+          outcome: 'error',
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+        this.logger.warn(`Webhook unavailable because ${providerName} is not configured`);
+        throw error;
+      }
+
       await this.receiptService.record({
         providerName,
         rawBodyHash,

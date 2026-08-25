@@ -15,6 +15,7 @@ export const WITHDRAWAL_STATUS_STYLES: Record<WithdrawalStatus, StatusStyle> = {
   pending_review: { label: 'Pending review', className: 'bg-neutral-100 text-neutral-700', icon: Clock3 },
   approved: { label: 'Approved', className: 'bg-amber-50 text-amber-700', icon: Clock3 },
   submitted: { label: 'Submitted', className: 'bg-amber-50 text-amber-700', icon: Clock3 },
+  unknown: { label: 'Provider outcome unknown', className: 'bg-amber-50 text-amber-700', icon: Clock3 },
   completed: { label: 'Completed', className: 'bg-brand-50 text-brand-600', icon: CheckCircle2 },
   failed: { label: 'Failed', className: 'bg-loss-50 text-loss-500', icon: XCircle },
   rejected: { label: 'Rejected', className: 'bg-loss-50 text-loss-500', icon: XCircle },

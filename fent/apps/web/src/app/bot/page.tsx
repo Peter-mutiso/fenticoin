@@ -22,7 +22,7 @@ export default function TradingBotPage() {
   const [stopLoss, setStopLoss] = useState('20');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const instrumentsQuery = useQuery({ queryKey: ['instruments'], queryFn: listInstruments });
+  const instrumentsQuery = useQuery({ queryKey: ['instruments'], queryFn: () => listInstruments() });
   const walletQuery = useQuery({ queryKey: ['wallet', 'USD'], queryFn: () => getWallet('USD'), enabled: authStatus === 'authenticated' });
   const instruments = instrumentsQuery.data?.items ?? [];
 

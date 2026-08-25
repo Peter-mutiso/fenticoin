@@ -24,7 +24,7 @@ export function BettingExperience() {
   const [dialogError, setDialogError] = useState<string | null>(null);
 
   // Queries
-  const instrumentsQuery = useQuery({ queryKey: ['instruments'], queryFn: listInstruments });
+  const instrumentsQuery = useQuery({ queryKey: ['instruments'], queryFn: () => listInstruments() });
   const instruments = instrumentsQuery.data?.items ?? [];
 
   const priceQuery = useQuery({
@@ -36,7 +36,7 @@ export function BettingExperience() {
 
   const configQuery = useQuery({
     queryKey: ['betting-config', selectedInstrumentId],
-    queryFn: () => getBettingConfig(selectedInstrumentId),
+    queryFn: () => getBettingConfig(selectedInstrumentId, 'rise_fall'),
     enabled: !!selectedInstrumentId,
   });
 
@@ -49,7 +49,8 @@ export function BettingExperience() {
         instrumentId: selectedInstrumentId,
         type: 'rise_fall',
         selection: direction,
-        stakeAmountMinorUnits: stakeMinorUnits,
+        stakeAmount: stakeMinorUnits,
+        currency: 'USD',
         durationSeconds: 30,
       });
     },

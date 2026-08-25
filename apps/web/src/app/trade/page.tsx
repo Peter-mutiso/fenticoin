@@ -26,7 +26,7 @@ export default function TradePage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Queries
-  const instrumentsQuery = useQuery({ queryKey: ['instruments'], queryFn: listInstruments });
+  const instrumentsQuery = useQuery({ queryKey: ['instruments'], queryFn: () => listInstruments() });
   const instruments = instrumentsQuery.data?.items ?? [];
 
   const selectedInstrument = instruments.find((i) => i.id === selectedInstrumentId);
@@ -40,7 +40,7 @@ export default function TradePage() {
 
   const configQuery = useQuery({
     queryKey: ['betting-config', selectedInstrumentId],
-    queryFn: () => getBettingConfig(selectedInstrumentId),
+    queryFn: () => getBettingConfig(selectedInstrumentId, 'rise_fall'),
     enabled: !!selectedInstrumentId,
   });
 
@@ -58,7 +58,8 @@ export default function TradePage() {
         instrumentId: selectedInstrumentId,
         type: 'rise_fall',
         selection: direction,
-        stakeAmountMinorUnits: stakeMinorUnits,
+        stakeAmount: stakeMinorUnits,
+        currency: selectedInstrument?.quoteCurrency ?? '',
         durationSeconds: duration,
       });
     },

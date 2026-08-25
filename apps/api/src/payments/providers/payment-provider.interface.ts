@@ -62,4 +62,16 @@ export interface PaymentProvider {
   verifyWithdrawal(providerReference: string): Promise<PaymentVerificationResult>;
 }
 
+export type WithdrawalSubmissionOutcome = 'rejected' | 'not_submitted' | 'unknown';
+
+export class PaymentProviderSubmissionError extends Error {
+  constructor(
+    message: string,
+    readonly outcome: WithdrawalSubmissionOutcome,
+  ) {
+    super(message);
+    this.name = 'PaymentProviderSubmissionError';
+  }
+}
+
 export const PAYMENT_PROVIDER = Symbol('PAYMENT_PROVIDER');

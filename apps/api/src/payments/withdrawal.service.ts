@@ -13,6 +13,8 @@ import { UsersService } from '../users/users.service';
 import { TransactionService } from '../wallet/transaction.service';
 import { requireCurrency } from '../wallet/wallet.constants';
 import { PaymentService } from './payment.service';
+import { PaymentProviderSubmissionError } from './providers/payment-provider.interface';
+import { ProviderNotConfiguredError } from '../auth/providers/provider-not-configured.error';
 import { MAX_WITHDRAWAL_MINOR_UNITS, MIN_WITHDRAWAL_MINOR_UNITS } from './payments.constants';
 import { assertLegalWithdrawalTransition } from './withdrawal-state-machine';
 import { WithdrawalEligibilityService } from './withdrawal-eligibility.service';
@@ -197,7 +199,7 @@ export class WithdrawalService {
   async verifyAndSettleWithdrawal(providerReference: string): Promise<WithdrawalVerificationOutcome> {
     const withdrawal = await this.getByProviderReference(this.paymentService.providerName, providerReference);
 
-    if (withdrawal.status !== 'submitted') {
+    if (withdrawal.status !== 'submitted' && withdrawal.status !== 'unknown') {
       return { withdrawal, wasAlreadyResolved: true };
     }
 
@@ -332,8 +334,30 @@ export class WithdrawalService {
     } catch (error) {
       this.logger.error(`Provider submission failed for withdrawal ${withdrawal.id}: ${String(error)}`);
       const reason = `Provider submission failed: ${error instanceof Error ? error.message : String(error)}`;
-      return this.failAndRelease(withdrawal, reason);
+      if (error instanceof PaymentProviderSubmissionError && error.outcome === 'unknown') {
+        return this.markSubmissionUnknown(withdrawal, reason);
+      }
+      if (
+        error instanceof ProviderNotConfiguredError ||
+        (error instanceof PaymentProviderSubmissionError &&
+          (error.outcome === 'rejected' || error.outcome === 'not_submitted'))
+      ) {
+        return this.failAndRelease(withdrawal, reason);
+      }
+      return this.markSubmissionUnknown(withdrawal, reason);
     }
+  }
+
+  private async markSubmissionUnknown(withdrawal: Withdrawal, reason: string): Promise<Withdrawal> {
+    const [updated] = await this.db
+      .update(withdrawals)
+      .set({ status: 'unknown', failureReason: reason, updatedAt: new Date() })
+      .where(and(eq(withdrawals.id, withdrawal.id), eq(withdrawals.status, 'approved')))
+      .returning();
+    if (!updated) return this.getById(withdrawal.id);
+    await this.auditLog.record({ actorUserId: null, actorType: 'system', action: 'withdrawal.submission_unknown', targetType: 'withdrawal', targetId: withdrawal.id, after: { reason } });
+    this.emitWithdrawalEvent(updated);
+    return updated;
   }
 
   private async completeWithdrawal(withdrawal: Withdrawal): Promise<Withdrawal> {
@@ -345,7 +369,7 @@ export class WithdrawalService {
       const [claimed] = await t
         .update(withdrawals)
         .set({ status: 'completed', updatedAt: new Date() })
-        .where(and(eq(withdrawals.id, withdrawal.id), eq(withdrawals.status, 'submitted')))
+        .where(and(eq(withdrawals.id, withdrawal.id), inArray(withdrawals.status, ['submitted', 'unknown'])))
         .returning();
 
       if (!claimed) {
@@ -381,7 +405,7 @@ export class WithdrawalService {
         targetType: 'withdrawal',
         targetId: claimed.id,
         after: { transactionId: settlementTx.id },
-      });
+      }, t);
 
       return linked;
     }).then((result) => {
@@ -398,7 +422,7 @@ export class WithdrawalService {
       const [claimed] = await t
         .update(withdrawals)
         .set({ status: 'failed', failureReason: reason, updatedAt: new Date() })
-        .where(and(eq(withdrawals.id, withdrawal.id), inArray(withdrawals.status, ['approved', 'submitted'])))
+        .where(and(eq(withdrawals.id, withdrawal.id), inArray(withdrawals.status, ['approved', 'submitted', 'unknown'])))
         .returning();
 
       if (!claimed) {

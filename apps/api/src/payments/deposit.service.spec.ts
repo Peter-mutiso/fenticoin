@@ -269,6 +269,18 @@ describe('DepositService', () => {
       expect(h.transactionService.deposit).not.toHaveBeenCalled();
     });
 
+    it('fails the deposit when independently verified currency does not match', async () => {
+      const h = makeHarness();
+      h.db.select.mockReturnValueOnce(chainable([depositRow({ amount: 5_000n, currency: 'USD' })]));
+      h.paymentService.verifyDeposit.mockResolvedValue({ status: 'completed', amountMinorUnits: 5_000n, currency: 'EUR' });
+      h.db.update.mockReturnValueOnce(updateReturning([depositRow({ status: 'failed', failureReason: 'mismatch' })]));
+
+      const { deposit } = await h.service.verifyAndCompleteDeposit('ref-1');
+
+      expect(deposit.status).toBe('failed');
+      expect(h.transactionService.deposit).not.toHaveBeenCalled();
+    });
+
     it('leaves the deposit pending when the provider itself still reports pending', async () => {
       const h = makeHarness();
       h.db.select.mockReturnValueOnce(chainable([depositRow()]));

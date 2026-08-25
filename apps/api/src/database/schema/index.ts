@@ -11,3 +11,4 @@ export * from './wallet';
 export * from './payments';
 export * from './markets';
 export * from './betting';
+export * from './bots';

@@ -100,6 +100,7 @@ export const bets = pgTable(
     payoutRateBasisPoints: bigint('payout_rate_basis_points', { mode: 'bigint' }).notNull(),
     potentialPayout: bigint('potential_payout', { mode: 'bigint' }).notNull(),
     status: betStatusEnum('status').notNull().default('open'),
+    settlementClaimToken: varchar('settlement_claim_token', { length: 64 }),
     result: betResultEnum('result'),
     placedAt: timestamp('placed_at', { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
