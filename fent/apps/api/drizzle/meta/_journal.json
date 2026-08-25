@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1787222795788,
+      "tag": "0000_clean_the_fallen",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787225289534,
+      "tag": "0001_closed_ironclad",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787226075644,
+      "tag": "0002_rapid_prowler",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787227435950,
+      "tag": "0003_vengeful_wolverine",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787228627612,
+      "tag": "0004_blue_lady_ursula",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787294150369,
+      "tag": "0005_right_ironclad",
+      "breakpoints": true
+    }
+  ]
+}
