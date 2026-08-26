@@ -77,7 +77,7 @@ describe('api-client', () => {
 
   describe('authenticated requests', () => {
     it('attaches the stored access token as a bearer header', async () => {
-      storeSession({ accessToken: 'access-1', refreshToken: 'refresh-1', user: { id: 'u1', email: 'a@b.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null } });
+      storeSession({ accessToken: 'access-1', refreshToken: 'refresh-1', user: { id: 'u1', email: 'a@b.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null, accountType: 'real', demoOfUserId: null } });
       (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ id: 'u1', email: 'a@b.com' }));
 
       await getMe();
@@ -87,11 +87,11 @@ describe('api-client', () => {
     });
 
     it('on a 401, refreshes the session once and retries the original request', async () => {
-      storeSession({ accessToken: 'stale-token', refreshToken: 'refresh-1', user: { id: 'u1', email: 'a@b.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null } });
+      storeSession({ accessToken: 'stale-token', refreshToken: 'refresh-1', user: { id: 'u1', email: 'a@b.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null, accountType: 'real', demoOfUserId: null } });
 
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce(errorResponse(401, 'Session has expired', 'UnauthorizedException')) // original request
-        .mockResolvedValueOnce(jsonResponse({ accessToken: 'fresh-token', refreshToken: 'refresh-2', user: { id: 'u1', email: 'a@b.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null } })) // refresh
+        .mockResolvedValueOnce(jsonResponse({ accessToken: 'fresh-token', refreshToken: 'refresh-2', user: { id: 'u1', email: 'a@b.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null, accountType: 'real', demoOfUserId: null } })) // refresh
         .mockResolvedValueOnce(jsonResponse({ id: 'bet-1' })); // retried request
 
       const result = await getBet('bet-1');
@@ -103,7 +103,7 @@ describe('api-client', () => {
     });
 
     it('throws SessionExpiredError and clears the session when refresh also fails', async () => {
-      storeSession({ accessToken: 'stale-token', refreshToken: 'refresh-1', user: { id: 'u1', email: 'a@b.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null } });
+      storeSession({ accessToken: 'stale-token', refreshToken: 'refresh-1', user: { id: 'u1', email: 'a@b.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null, accountType: 'real', demoOfUserId: null } });
 
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce(errorResponse(401, 'Session has expired', 'UnauthorizedException')) // original

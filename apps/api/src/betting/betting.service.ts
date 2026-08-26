@@ -32,6 +32,8 @@ export interface PlaceBetInput {
   currency: string;
   durationSeconds: bigint;
   idempotencyKey?: string;
+  /** Set only when `BotExecutionService` is placing this bet on a user's behalf — pure attribution, no effect on placement/settlement logic. */
+  botId?: string;
 }
 
 /**
@@ -154,6 +156,7 @@ export class BettingService {
             placedAt,
             expiresAt,
             idempotencyKey: input.idempotencyKey,
+            botId: input.botId,
           })
           .returning();
         if (!betRow) throw new Error('Failed to create bet');
@@ -207,10 +210,11 @@ export class BettingService {
 
   async listForUser(
     userId: string,
-    params: { limit: number; offset: number; status?: Bet['status'] },
+    params: { limit: number; offset: number; status?: Bet['status']; botId?: string },
   ): Promise<Bet[]> {
     const conditions = [eq(bets.userId, userId)];
     if (params.status) conditions.push(eq(bets.status, params.status));
+    if (params.botId) conditions.push(eq(bets.botId, params.botId));
 
     return this.db
       .select()

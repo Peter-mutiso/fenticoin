@@ -7,6 +7,17 @@ export const accountStatusEnum = pgEnum('account_status', [
   'pending_deletion',
 ]);
 
+/**
+ * `real`: an ordinary user. `demo`: a server-provisioned shadow account
+ * linked back to exactly one real user via `users.demoOfUserId` — see that
+ * column's comment. Every financial table (wallets, bets, bots,
+ * transactions) already isolates strictly by `userId`, so a demo shadow
+ * gets its own wallet/ledger/bets/bots for free with no schema changes to
+ * any of them; this is the only new column the feature needs.
+ */
+export const accountTypeEnum = pgEnum('account_type', ['real', 'demo']);
+export type AccountType = (typeof accountTypeEnum.enumValues)[number];
+
 export const kycStatusEnum = pgEnum('kyc_status', ['unverified', 'pending', 'approved', 'rejected']);
 
 export const eligibilityStatusEnum = pgEnum('eligibility_status', [

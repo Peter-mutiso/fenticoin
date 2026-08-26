@@ -48,7 +48,7 @@ describe('LoginForm', () => {
     mockLogin.mockResolvedValue({
       accessToken: 'a',
       refreshToken: 'r',
-      user: { id: 'u1', email: 'trader@example.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null },
+      user: { id: 'u1', email: 'trader@example.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null, accountType: 'real', demoOfUserId: null },
     });
 
     renderForm();
@@ -67,7 +67,7 @@ describe('LoginForm', () => {
     mockLoginWithTwoFactor.mockResolvedValue({
       accessToken: 'a',
       refreshToken: 'r',
-      user: { id: 'u1', email: 'trader@example.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null },
+      user: { id: 'u1', email: 'trader@example.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null, accountType: 'real', demoOfUserId: null },
     });
 
     renderForm();

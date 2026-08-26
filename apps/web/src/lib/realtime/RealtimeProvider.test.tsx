@@ -58,7 +58,7 @@ function fire(socket: FakeSocket, eventName: string, payload?: unknown): void {
   act(() => socket.fire(eventName, payload));
 }
 
-const user = { id: 'user-1', email: 'trader@example.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null };
+const user = { id: 'user-1', email: 'trader@example.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null, accountType: 'real' as const, demoOfUserId: null };
 
 function authenticate() {
   storeSession({ accessToken: 'access-1', refreshToken: 'refresh-1', user });

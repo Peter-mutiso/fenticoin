@@ -113,6 +113,9 @@ export function UsersList() {
                     <p className="mt-0.5 text-xs text-neutral-500">Joined {new Date(user.createdAt).toLocaleDateString()}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
+                    {user.accountType === 'demo' && (
+                      <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-brand-600">Demo</span>
+                    )}
                     <StatusBadge status={user.kycStatus} styles={KYC_STATUS_STYLES} />
                     <StatusBadge status={user.status} styles={ACCOUNT_STATUS_STYLES} />
                   </div>

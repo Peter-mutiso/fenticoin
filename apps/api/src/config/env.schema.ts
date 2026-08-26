@@ -68,6 +68,12 @@ export const envSchema = z.object({
   // silent guess) in production — see markets/providers/providers.module.ts.
   MARKET_DATA_PROVIDER: z.enum(['coingecko']).optional(),
   COINGECKO_API_KEY: z.string().optional(),
+
+  // Starting balance a freshly-provisioned demo shadow account is funded
+  // with (via a real ledger credit, see `DemoService`) — configurable so
+  // it isn't a hardcoded value scattered through the app.
+  DEMO_INITIAL_BALANCE_MINOR_UNITS: z.coerce.number().int().positive().default(1_000_000),
+  DEMO_CURRENCY: z.string().length(3).default('USD'),
 });
 
 export type Env = z.infer<typeof envSchema>;

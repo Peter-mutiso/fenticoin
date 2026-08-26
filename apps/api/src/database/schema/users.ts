@@ -1,7 +1,17 @@
 import { sql } from 'drizzle-orm';
-import { check, date, index, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  type AnyPgColumn,
+  check,
+  date,
+  index,
+  pgTable,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 
-import { accountStatusEnum, eligibilityStatusEnum, kycStatusEnum } from './enums';
+import { accountStatusEnum, accountTypeEnum, eligibilityStatusEnum, kycStatusEnum } from './enums';
 
 /**
  * Core identity record. Deliberately holds only auth/compliance-critical
@@ -24,6 +34,12 @@ export const users = pgTable(
     kycStatus: kycStatusEnum('kyc_status').notNull().default('unverified'),
     eligibilityStatus: eligibilityStatusEnum('eligibility_status').notNull().default('unknown'),
     dateOfBirth: date('date_of_birth', { mode: 'string' }),
+    accountType: accountTypeEnum('account_type').notNull().default('real'),
+    // Set only on a `demo` row — points back to the one real user this demo
+    // shadow belongs to. `onDelete: 'cascade'` so deleting a real user takes
+    // their demo shadow (and everything under it) with them. The unique
+    // index below is what makes this 1:1 rather than 1:many.
+    demoOfUserId: uuid('demo_of_user_id').references((): AnyPgColumn => users.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -31,6 +47,10 @@ export const users = pgTable(
     index('users_status_idx').on(table.status),
     index('users_kyc_status_idx').on(table.kycStatus),
     index('users_created_at_idx').on(table.createdAt),
+    index('users_account_type_idx').on(table.accountType),
+    uniqueIndex('users_demo_of_user_id_idx')
+      .on(table.demoOfUserId)
+      .where(sql`${table.demoOfUserId} IS NOT NULL`),
     // Defense-in-depth floor only — the real, jurisdiction-specific minimum
     // age/eligibility policy is enforced in the application layer and is a
     // compliance decision, not a hardcoded constant (see docs/ARCHITECTURE.md
@@ -38,6 +58,10 @@ export const users = pgTable(
     check(
       'users_date_of_birth_min_age_floor',
       sql`${table.dateOfBirth} IS NULL OR ${table.dateOfBirth} <= (current_date - interval '18 years')`,
+    ),
+    check(
+      'users_account_type_shape',
+      sql`(${table.accountType} = 'demo' AND ${table.demoOfUserId} IS NOT NULL) OR (${table.accountType} = 'real' AND ${table.demoOfUserId} IS NULL)`,
     ),
   ],
 );

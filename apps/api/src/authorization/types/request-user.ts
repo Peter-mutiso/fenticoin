@@ -9,4 +9,8 @@ export interface RequestUser {
   sessionId: string;
   roles: RoleKey[];
   permissions: PermissionKey[];
+  /** `'demo'` for a server-provisioned demo shadow account — see `users.accountType`. Never trust a client-supplied equivalent; this is resolved fresh from the DB on every request. */
+  accountType: 'real' | 'demo';
+  /** Set only when `accountType === 'demo'` — the real user this shadow belongs to. */
+  demoOfUserId: string | null;
 }

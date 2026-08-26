@@ -11,6 +11,8 @@ import type { AuthResult, PublicUser } from '@/types/auth';
 const ACCESS_TOKEN_KEY = 'fenticoin.accessToken';
 const REFRESH_TOKEN_KEY = 'fenticoin.refreshToken';
 const USER_KEY = 'fenticoin.user';
+/** Where the real-account session is stashed while Demo Mode is active — see `stashRealSession`/`restoreRealSession`. */
+const REAL_SESSION_KEY = 'fenticoin.realSession';
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined';
@@ -44,9 +46,51 @@ export function storeSession(result: AuthResult): void {
   window.localStorage.setItem(USER_KEY, JSON.stringify(result.user));
 }
 
+/**
+ * Clears the active session — and any stashed real session with it. A full
+ * logout (including logging out directly from within Demo Mode via the
+ * plain "Log out" button, rather than "Exit Demo Mode") must leave no
+ * leftover state: without this, a stash left behind by that path would
+ * silently survive to a *later*, unrelated login, and `stashRealSession`'s
+ * "no-op if already stashed" guard would then skip stashing the new real
+ * session — so a subsequent "Exit Demo Mode" would restore the wrong
+ * (possibly stale/rotated) tokens instead of the session actually active.
+ */
 export function clearSession(): void {
   if (!isBrowser()) return;
   window.localStorage.removeItem(ACCESS_TOKEN_KEY);
   window.localStorage.removeItem(REFRESH_TOKEN_KEY);
   window.localStorage.removeItem(USER_KEY);
+  window.localStorage.removeItem(REAL_SESSION_KEY);
+}
+
+/**
+ * Copies the *currently active* session into a separate slot before it's
+ * overwritten by a demo session, so "Exit Demo Mode" can restore it without
+ * a network call. No-op if a real session is already stashed (entering
+ * demo mode twice in a row must never overwrite the original with a demo
+ * session by mistake).
+ */
+export function stashRealSession(): void {
+  if (!isBrowser()) return;
+  if (window.localStorage.getItem(REAL_SESSION_KEY)) return;
+
+  const accessToken = getStoredAccessToken();
+  const refreshToken = getStoredRefreshToken();
+  const user = getStoredUser();
+  if (!accessToken || !refreshToken || !user) return;
+
+  window.localStorage.setItem(REAL_SESSION_KEY, JSON.stringify({ accessToken, refreshToken, user }));
+}
+
+export function restoreRealSession(): AuthResult | null {
+  if (!isBrowser()) return null;
+  const raw = window.localStorage.getItem(REAL_SESSION_KEY);
+  if (!raw) return null;
+  window.localStorage.removeItem(REAL_SESSION_KEY);
+  try {
+    return JSON.parse(raw) as AuthResult;
+  } catch {
+    return null;
+  }
 }

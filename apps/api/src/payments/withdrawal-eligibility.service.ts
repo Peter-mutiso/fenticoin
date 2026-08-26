@@ -13,6 +13,9 @@ import type { User } from '../database/schema';
 @Injectable()
 export class WithdrawalEligibilityService {
   assertCanWithdraw(user: User): void {
+    if (user.accountType === 'demo') {
+      throw new ForbiddenException('Demo accounts cannot withdraw real money');
+    }
     if (user.status !== 'active') {
       throw new ForbiddenException(`Account is ${user.status} and cannot withdraw funds`);
     }

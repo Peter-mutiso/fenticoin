@@ -14,7 +14,8 @@ export type RealtimeEventType =
   | 'withdrawal.status_changed'
   | 'market.price'
   | 'market.status'
-  | 'notification.new';
+  | 'notification.new'
+  | 'demo.reset';
 
 /**
  * `id` is a deterministic idempotency key derived from the underlying row

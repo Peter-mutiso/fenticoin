@@ -83,6 +83,8 @@ export class AuthGuard implements CanActivate {
       sessionId: session.id,
       roles,
       permissions,
+      accountType: user.accountType,
+      demoOfUserId: user.demoOfUserId,
     };
 
     return true;

@@ -2,16 +2,21 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
 import { listInstruments } from '@/lib/api-client';
 import { describeApiError } from '@/lib/api-errors';
+import { useAuth } from '@/lib/auth/AuthContext';
+import { useWalletBalance } from '@/hooks/useWalletBalance';
+import { formatCurrencyMinorUnits } from '@/lib/money';
 import { Notice } from '@/components/ui/Notice';
 import { InstrumentCard } from './InstrumentCard';
 
 export function MarketsBrowser() {
   const [search, setSearch] = useState('');
-  const [accountType, setAccountType] = useState<'real' | 'demo'>('real');
+  const { status: authStatus } = useAuth();
+  const walletQuery = useWalletBalance('USD');
 
   const instrumentsQuery = useQuery({
     queryKey: ['instruments'],
@@ -44,57 +49,40 @@ export function MarketsBrowser() {
           </div>
         </div>
 
-        {/* Real / Demo Toggle Tabs */}
-        <div className="mt-4 flex rounded-full bg-neutral-100 p-1">
-          <button
-            type="button"
-            onClick={() => setAccountType('real')}
-            className={`flex-1 rounded-full py-2.5 text-xs font-bold transition ${
-              accountType === 'real' ? 'bg-[#00C853] text-neutral-950 shadow-md' : 'text-neutral-500'
-            }`}
-          >
-            Real Account
-          </button>
-          <button
-            type="button"
-            onClick={() => setAccountType('demo')}
-            className={`flex-1 rounded-full py-2.5 text-xs font-bold transition ${
-              accountType === 'demo' ? 'bg-[#00C853] text-neutral-950 shadow-md' : 'text-neutral-500'
-            }`}
-          >
-            Demo Account
-          </button>
-        </div>
-
-        <div className="mt-5 flex items-baseline justify-between">
+        <div className="mt-4 flex items-baseline justify-between">
           <span className="text-xs text-neutral-400">Current Balance</span>
-          <span className="text-2xl font-extrabold text-neutral-950">Unavailable</span>
+          <span className="text-2xl font-extrabold text-neutral-950">
+            {authStatus !== 'authenticated'
+              ? 'Log in to view'
+              : walletQuery.isPending
+                ? 'Loading…'
+                : walletQuery.data
+                  ? formatCurrencyMinorUnits(walletQuery.data.availableMinorUnits, walletQuery.data.currency)
+                  : 'Unavailable'}
+          </span>
         </div>
 
         {/* Action Buttons: Green Deposit & Red Withdraw */}
         <div className="mt-5 grid grid-cols-2 gap-3">
-          <a
+          <Link
             href="/account/deposit"
             className="flex items-center justify-center rounded-2xl bg-[#00C853] py-3.5 text-sm font-bold text-neutral-950 shadow-lg shadow-emerald-500/20 transition hover:bg-[#00b048]"
           >
             Deposit
-          </a>
-          <a
+          </Link>
+          <Link
             href="/account/withdraw"
             className="flex items-center justify-center rounded-2xl bg-[#ff2d55] py-3.5 text-sm font-bold text-white shadow-lg shadow-rose-500/20 transition hover:bg-[#e0264a]"
           >
             Withdraw
-          </a>
+          </Link>
         </div>
       </div>
 
-      {/* Table Headers (Name / Vol | Last Price | 24h chg) */}
+      {/* Table header */}
       <div className="flex items-center justify-between px-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-        <span>Name / Vol</span>
-        <div className="flex gap-12 text-right">
-          <span>Last Price</span>
-          <span>24h chg</span>
-        </div>
+        <span>Name</span>
+        <span>Last Price</span>
       </div>
 
       {/* Search Bar */}
@@ -118,7 +106,9 @@ export function MarketsBrowser() {
           <p className="text-sm text-neutral-500">Loading instruments...</p>
         ) : filtered.length > 0 ? filtered.map((instrument) => (
           <InstrumentCard key={instrument.id} instrument={instrument} />
-        )) : !instrumentsQuery.error && <Notice text="No instruments available right now." />}
+        )) : !instrumentsQuery.error && (
+          <Notice text={search.trim() ? 'No markets match your search.' : 'No instruments available right now.'} />
+        )}
       </div>
     </div>
   );

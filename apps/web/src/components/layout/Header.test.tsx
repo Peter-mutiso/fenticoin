@@ -26,9 +26,18 @@ function authenticate() {
   storeSession({
     accessToken: 'access-1',
     refreshToken: 'refresh-1',
-    user: { id: 'user-1', email: 'trader@example.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null },
+    user: { id: 'user-1', email: 'trader@example.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null, accountType: 'real', demoOfUserId: null },
   });
   mockGetMe.mockResolvedValue({ id: 'user-1', email: 'trader@example.com', status: 'active', sessionId: 's1', roles: [], permissions: [] });
+}
+
+function authenticateAsDemo() {
+  storeSession({
+    accessToken: 'access-demo',
+    refreshToken: 'refresh-demo',
+    user: { id: 'demo-user-1', email: 'demo+user-1@fenticoin.demo.internal', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null, accountType: 'demo', demoOfUserId: 'user-1' },
+  });
+  mockGetMe.mockResolvedValue({ id: 'demo-user-1', email: 'demo+user-1@fenticoin.demo.internal', status: 'active', sessionId: 's-demo', roles: [], permissions: [] });
 }
 
 describe('Header', () => {
@@ -87,5 +96,26 @@ describe('Header', () => {
     });
 
     await waitFor(() => expect(screen.getByLabelText(/notifications/i)).toHaveTextContent('1'));
+  });
+
+  it('shows a persistent Demo Mode indicator for a demo account, and never for a real one', async () => {
+    authenticateAsDemo();
+    mockGetWallet.mockResolvedValue({ currency: 'USD', availableMinorUnits: '1000000', available: '10000.00', lockedMinorUnits: '0', locked: '0.00' });
+    mockListBets.mockResolvedValue({ items: [] });
+
+    renderWithProviders(<Header />);
+
+    expect(await screen.findByText(/demo mode/i)).toBeInTheDocument();
+  });
+
+  it('shows no Demo Mode indicator for a real account', async () => {
+    authenticate();
+    mockGetWallet.mockResolvedValue({ currency: 'USD', availableMinorUnits: '0', available: '0.00', lockedMinorUnits: '0', locked: '0.00' });
+    mockListBets.mockResolvedValue({ items: [] });
+
+    renderWithProviders(<Header />);
+
+    await waitFor(() => expect(screen.getByText('$0.00')).toBeInTheDocument());
+    expect(screen.queryByText(/demo mode/i)).not.toBeInTheDocument();
   });
 });

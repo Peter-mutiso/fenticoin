@@ -48,6 +48,12 @@ export default function LoginPage() {
                 <span>Don&rsquo;t have an account?</span>
                 <Link href="/signup" className="font-bold text-brand-600 hover:text-brand-700">Create one</Link>
               </div>
+              <p className="mt-2 text-center text-xs text-neutral-400">
+                New here?{' '}
+                <Link href="/signup" className="font-semibold text-neutral-600 hover:text-neutral-800">
+                  Create a free account to try Demo Mode
+                </Link>
+              </p>
             </div>
           </div>
         </section>

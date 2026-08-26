@@ -17,9 +17,11 @@ const PAGE_SIZE = 25;
 
 export function UserTransactionsTab({ userId }: { userId: string }) {
   const [offset, setOffset] = useState(0);
+  // No realtime relay covers wallet changes on the admin socket yet — poll as a fallback, matching the convention used by DepositsList/WithdrawalsList/RiskQueue.
   const query = useQuery({
     queryKey: ['wallet-transactions', userId, offset],
     queryFn: () => listWalletTransactions(userId, { limit: PAGE_SIZE, offset }),
+    refetchInterval: 30_000,
   });
 
   const items = query.data?.items ?? [];

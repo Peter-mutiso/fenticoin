@@ -41,7 +41,7 @@ function invalidationKeysFor(event: RealtimeEvent): QueryKey[] {
       return [['admin-withdrawals'], ['reports', 'overview']];
     case 'bet.updated':
     case 'bet.settled':
-      return [['bets-requiring-review'], ['admin-bets'], ['reports', 'overview']];
+      return [['bets-requiring-review'], ['admin-bets'], ['admin-bet', event.entityId], ['reports', 'overview']];
     default:
       return [];
   }

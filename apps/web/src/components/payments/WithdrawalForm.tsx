@@ -16,7 +16,7 @@ import { useToast } from '@/components/ui/Toast';
 import { WITHDRAWAL_STATUS_STYLES } from './payment-display';
 
 export function WithdrawalForm() {
-  const { status: authStatus } = useAuth();
+  const { status: authStatus, isDemo } = useAuth();
   const { show } = useToast();
   const queryClient = useQueryClient();
   const enabled = authStatus === 'authenticated';
@@ -75,6 +75,10 @@ export function WithdrawalForm() {
         </Link>
       </div>
     );
+  }
+
+  if (isDemo) {
+    return <Notice tone="info" text="Demo accounts use virtual funds. Withdrawals are unavailable in Demo Mode." />;
   }
 
   return (

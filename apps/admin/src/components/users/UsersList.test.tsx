@@ -21,6 +21,8 @@ const user = {
   kycStatus: 'approved' as const,
   eligibilityStatus: 'eligible' as const,
   dateOfBirth: null,
+  accountType: 'real' as const,
+  demoOfUserId: null,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -35,6 +37,14 @@ describe('UsersList', () => {
     renderWithProviders(<UsersList />);
 
     expect(await screen.findByText('trader@example.com')).toBeInTheDocument();
+  });
+
+  it('badges a demo shadow account so admins never mistake it for real activity', async () => {
+    mockListUsers.mockResolvedValue({ items: [{ ...user, id: 'demo-user-1', email: 'demo+user-1@fenticoin.demo.internal', accountType: 'demo' as const, demoOfUserId: 'user-1' }] });
+    renderWithProviders(<UsersList />);
+
+    await screen.findByText('demo+user-1@fenticoin.demo.internal');
+    expect(screen.getByText('Demo')).toBeInTheDocument();
   });
 
   it('shows an honest empty state rather than fabricated rows', async () => {

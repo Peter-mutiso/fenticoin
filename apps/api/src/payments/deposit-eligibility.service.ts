@@ -12,6 +12,9 @@ import type { User } from '../database/schema';
 @Injectable()
 export class DepositEligibilityService {
   assertCanDeposit(user: User): void {
+    if (user.accountType === 'demo') {
+      throw new ForbiddenException('Demo accounts cannot make real-money deposits');
+    }
     if (user.status !== 'active') {
       throw new ForbiddenException(`Account is ${user.status} and cannot deposit funds`);
     }

@@ -9,11 +9,12 @@ import {
   loginWithTwoFactor as apiLoginWithTwoFactor,
   logout as apiLogout,
   logoutAll as apiLogoutAll,
+  enterDemo as apiEnterDemo,
   NetworkError,
 } from '@/lib/api-client';
 import type { PublicUser } from '@/types/auth';
 import { isTwoFactorChallenge } from '@/types/auth';
-import { clearSession, getStoredUser, storeSession } from './token-storage';
+import { clearSession, getStoredUser, restoreRealSession, stashRealSession, storeSession } from './token-storage';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -22,6 +23,8 @@ export type LoginOutcome = { twoFactorRequired: true; challengeToken: string } |
 interface AuthContextValue {
   status: AuthStatus;
   user: PublicUser | null;
+  /** Derived from `user.accountType === 'demo'` — see `Header`'s Demo Mode pill and `AccountMenu`'s enter/exit/reset controls. */
+  isDemo: boolean;
   /**
    * Set only when hydration's `getMe()` call failed because the API
    * couldn't be reached at all (timeout/offline/DNS/CORS) — as opposed to
@@ -37,6 +40,10 @@ interface AuthContextValue {
   logoutAll: () => Promise<void>;
   /** Re-runs hydration — used by the "can't reach the server, retry" recovery action. */
   retry: () => void;
+  /** Stashes the current real session, then swaps the active session to the caller's linked demo shadow account (provisioning/funding it server-side on first use). */
+  enterDemoMode: () => Promise<void>;
+  /** Best-effort logs out the demo session, then restores the stashed real session — a pure client-side swap, no re-authentication required. */
+  exitDemoMode: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -149,9 +156,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus('unauthenticated');
   }, []);
 
+  const enterDemoMode = useCallback(async (): Promise<void> => {
+    stashRealSession();
+    const result = await apiEnterDemo();
+    storeSession(result);
+    setUser(result.user);
+    setStatus('authenticated');
+  }, []);
+
+  const exitDemoMode = useCallback(async (): Promise<void> => {
+    // Consume the stash *before* logging out: `apiLogout()` (the plain
+    // `logout()` API client function, shared with a direct "Log out" click)
+    // always clears the active session's storage itself once the request
+    // settles — see its own `finally { clearSession(); }` — and
+    // `clearSession()` also clears any stashed real session (so a direct
+    // logout from within Demo Mode doesn't leave a stale stash behind for a
+    // later, unrelated login). Reading the stash after that clear would
+    // always find nothing; popping it first makes the outcome independent
+    // of when/whether `apiLogout()`'s own cleanup runs.
+    const restored = restoreRealSession();
+    try {
+      await apiLogout();
+    } catch {
+      // Best-effort — the demo session is discarded either way.
+    }
+    if (restored) {
+      storeSession(restored);
+      setUser(restored.user);
+      setStatus('authenticated');
+    } else {
+      // Nothing to fall back to (e.g. storage was cleared mid-session) — a
+      // full logout is the honest outcome, not silently staying "in" a
+      // session that no longer has a real account behind it.
+      clearSession();
+      setUser(null);
+      setStatus('unauthenticated');
+    }
+  }, []);
+
+  const isDemo = user?.accountType === 'demo';
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, hydrationError, login, register, loginWithTwoFactor, logout, logoutAll, retry }),
-    [status, user, hydrationError, login, register, loginWithTwoFactor, logout, logoutAll, retry],
+    () => ({
+      status,
+      user,
+      isDemo,
+      hydrationError,
+      login,
+      register,
+      loginWithTwoFactor,
+      logout,
+      logoutAll,
+      retry,
+      enterDemoMode,
+      exitDemoMode,
+    }),
+    [status, user, isDemo, hydrationError, login, register, loginWithTwoFactor, logout, logoutAll, retry, enterDemoMode, exitDemoMode],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

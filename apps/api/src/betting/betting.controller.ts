@@ -49,6 +49,7 @@ export class BettingController {
       limit: query.limit ?? 25,
       offset: query.offset ?? 0,
       status: query.status,
+      botId: query.botId,
     });
     return { items: items.map(serializeBet) };
   }

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gte, inArray, lte, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte, ne, sql } from 'drizzle-orm';
 
 import { DRIZZLE_CLIENT } from '../database/database.constants';
 import type { DrizzleDb } from '../database/database.types';
@@ -34,6 +34,11 @@ export interface RevenueReport {
  * (`won`/`lost`) bets over an explicit date range — void/cancelled/refunded/
  * open/pending/disputed/requires_review bets have no realized financial
  * outcome yet and are deliberately excluded.
+ *
+ * Every aggregate here also excludes demo shadow accounts
+ * (`users.accountType = 'demo'`) — a demo account's activity is virtual
+ * money exercising the real pipeline for testing/demos, and must never be
+ * counted toward real-money revenue, user, or review-queue figures.
  */
 @Injectable()
 export class ReportsService {
@@ -43,6 +48,7 @@ export class ReportsService {
     const usersByStatus = await this.db
       .select({ status: users.status, count: sql<number>`count(*)::int` })
       .from(users)
+      .where(ne(users.accountType, 'demo'))
       .groupBy(users.status);
 
     const [pendingDeposits] = await this.db
@@ -58,7 +64,8 @@ export class ReportsService {
     const [betsRequiringReview] = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(bets)
-      .where(eq(bets.status, 'requires_review'));
+      .innerJoin(users, eq(bets.userId, users.id))
+      .where(and(eq(bets.status, 'requires_review'), ne(users.accountType, 'demo')));
 
     return {
       usersByStatus,
@@ -78,7 +85,15 @@ export class ReportsService {
         count: sql<number>`count(*)::int`,
       })
       .from(bets)
-      .where(and(gte(bets.placedAt, from), lte(bets.placedAt, to), inArray(bets.status, ['won', 'lost'])))
+      .innerJoin(users, eq(bets.userId, users.id))
+      .where(
+        and(
+          gte(bets.placedAt, from),
+          lte(bets.placedAt, to),
+          inArray(bets.status, ['won', 'lost']),
+          ne(users.accountType, 'demo'),
+        ),
+      )
       .groupBy(bets.currency, bets.status);
 
     const byCurrency = new Map<string, { wonStake: bigint; lostStake: bigint; wonPayout: bigint; count: number }>();

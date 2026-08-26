@@ -1,17 +1,33 @@
 import { BotExecutionService } from './bot-execution.service';
 
 describe('BotExecutionService', () => {
-  const bot = { id: 'bot-1', userId: 'user-1', status: 'active', strategyKey: 'future' } as never;
+  const bot = { id: 'bot-1', userId: 'user-1', status: 'active', strategyKey: 'future', createdAt: new Date('2026-01-01T00:00:00.000Z') } as never;
 
-  function makeService(strategy: object | undefined) {
-    const db = {
-      select: jest.fn().mockReturnValue({ from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([bot]) }) }) }),
-    };
+  function chainResolving(value: unknown) {
+    return { from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue(value) }) }) };
+  }
+
+  function makeService(strategy: object | undefined, existingBetForKey: unknown[] = []) {
+    const selectMock = jest
+      .fn()
+      .mockReturnValueOnce(chainResolving([bot]))
+      .mockReturnValueOnce(chainResolving(existingBetForKey));
+    const db = { select: selectMock, insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }) };
     const bettingService = { placeBet: jest.fn().mockResolvedValue({ id: 'bet-1' }) };
     const auditLog = { record: jest.fn() };
     const service = new BotExecutionService(db as never, bettingService as never, auditLog as never, strategy ? [strategy as never] : []);
-    return { service, bettingService, auditLog };
+    return { service, db, bettingService, auditLog };
   }
+
+  const signal = {
+    instrumentId: 'instrument-1',
+    type: 'rise_fall',
+    selection: 'rise',
+    stakeAmount: 100n,
+    currency: 'USD',
+    durationSeconds: 30,
+    dedupeKey: 'dca:5',
+  };
 
   it('does not trade when no strategy is configured', async () => {
     const h = makeService(undefined);
@@ -19,13 +35,47 @@ describe('BotExecutionService', () => {
     expect(h.bettingService.placeBet).not.toHaveBeenCalled();
   });
 
-  it('executes strategy signals through BettingService with deterministic idempotency', async () => {
-    const strategy = { key: 'future', evaluate: jest.fn().mockResolvedValue({ instrumentId: 'instrument-1', type: 'rise_fall', selection: 'rise', stakeAmount: 100n, currency: 'USD', durationSeconds: 30 }) };
+  it('does not write a log row when the strategy returns no signal (avoids per-tick log spam)', async () => {
+    const strategy = { key: 'future', evaluate: jest.fn().mockResolvedValue(null) };
+    const h = makeService(strategy);
+    expect(await h.service.execute('bot-1')).toBe(false);
+    expect(h.db.insert).not.toHaveBeenCalled();
+  });
+
+  it('executes strategy signals through BettingService with a deterministic, dedupe-based idempotency key', async () => {
+    const strategy = { key: 'future', evaluate: jest.fn().mockResolvedValue(signal) };
     const h = makeService(strategy);
     const now = new Date('2026-01-01T00:00:00.000Z');
 
     expect(await h.service.execute('bot-1', now)).toBe(true);
-    expect(h.bettingService.placeBet).toHaveBeenCalledWith(expect.objectContaining({ userId: 'user-1', idempotencyKey: 'bot:bot-1:2026-01-01T00:00:00.000Z' }));
+    expect(h.bettingService.placeBet).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', botId: 'bot-1', idempotencyKey: 'bot:bot-1:dca:5' }),
+    );
     expect(h.auditLog.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'bot.bet_placed', targetId: 'bot-1' }));
+    expect(h.db.insert).toHaveBeenCalled();
+  });
+
+  it('never calls placeBet twice for the same schedule slot — the pre-check finds the already-placed bet', async () => {
+    const strategy = { key: 'future', evaluate: jest.fn().mockResolvedValue(signal) };
+    const h = makeService(strategy, [{ id: 'bet-existing' }]);
+    expect(await h.service.execute('bot-1')).toBe(false);
+    expect(h.bettingService.placeBet).not.toHaveBeenCalled();
+  });
+
+  it('logs an error and does not throw when placeBet fails', async () => {
+    const strategy = { key: 'future', evaluate: jest.fn().mockResolvedValue(signal) };
+    const h = makeService(strategy);
+    h.bettingService.placeBet.mockRejectedValue(new Error('insufficient funds'));
+
+    await expect(h.service.execute('bot-1')).resolves.toBe(false);
+    expect(h.db.insert).toHaveBeenCalled();
+  });
+
+  it('logs an error and does not throw when strategy evaluation itself fails', async () => {
+    const strategy = { key: 'future', evaluate: jest.fn().mockRejectedValue(new Error('bad config')) };
+    const h = makeService(strategy);
+
+    await expect(h.service.execute('bot-1')).resolves.toBe(false);
+    expect(h.db.insert).toHaveBeenCalled();
   });
 });

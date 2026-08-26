@@ -29,7 +29,7 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 
-const user = { id: 'user-1', email: 'trader@example.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null };
+const user = { id: 'user-1', email: 'trader@example.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null, accountType: 'real' as const, demoOfUserId: null };
 
 function authenticate() {
   storeSession({ accessToken: 'access-1', refreshToken: 'refresh-1', user });
@@ -40,6 +40,10 @@ describe('DashboardPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     window.localStorage.clear();
+    // `clearAllMocks` resets call history but not implementations set via `.mockResolvedValue` in
+    // an earlier test — without a fresh default here, a test that never calls `authenticate()`
+    // would inherit an earlier test's resolved user and incorrectly appear logged in.
+    mockGetMe.mockRejectedValue(new Error('Unauthorized'));
   });
 
   it('renders the betting experience heading and the review-bet action once authenticated', async () => {

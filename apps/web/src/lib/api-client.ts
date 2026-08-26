@@ -68,6 +68,7 @@ function normalizeApiUrl(baseUrl: string, path: string): string {
 async function rawFetch(
   path: string,
   init?: RequestInit,
+  timeoutMs = 12_000,
 ): Promise<Response> {
   const { NEXT_PUBLIC_API_URL } = getPublicEnv();
 
@@ -77,7 +78,7 @@ async function rawFetch(
 
   const timeout = setTimeout(() => {
     controller.abort();
-  }, 12_000);
+  }, timeoutMs);
 
   try {
     const signal = init?.signal;
@@ -200,6 +201,7 @@ async function authedFetch<T>(
   path: string,
   init?: RequestInit,
   allowRefresh = true,
+  timeoutMs?: number,
 ): Promise<T> {
   const accessToken = getStoredAccessToken();
 
@@ -212,10 +214,14 @@ async function authedFetch<T>(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  const response = await rawFetch(path, {
-    ...init,
-    headers,
-  });
+  const response = await rawFetch(
+    path,
+    {
+      ...init,
+      headers,
+    },
+    timeoutMs,
+  );
 
   if (response.status === 401) {
     if (
@@ -226,6 +232,7 @@ async function authedFetch<T>(
         path,
         init,
         false,
+        timeoutMs,
       );
     }
 
@@ -409,10 +416,25 @@ export interface RequestUser {
   sessionId: string;
   roles: string[];
   permissions: string[];
+  accountType: 'real' | 'demo';
+  demoOfUserId: string | null;
 }
 
 export function getMe(): Promise<RequestUser> {
   return authedFetch<RequestUser>('/auth/me');
+}
+
+// ---- demo mode -----------------------------------------------------------
+
+export function enterDemo(): Promise<AuthResult> {
+  // First-time entry provisions a whole new wallet/ledger for the demo
+  // shadow account in one transaction — a heavier one-time operation than
+  // the default timeout budgets for, so it gets a longer allowance.
+  return authedFetch<AuthResult>('/demo/enter', { method: 'POST' }, true, 30_000);
+}
+
+export function resetDemoAccount(): Promise<void> {
+  return authedFetch<void>('/demo/reset', { method: 'POST' });
 }
 
 // ---- wallet ------------------------------------------------------------
@@ -641,6 +663,7 @@ export interface Bet {
   placementTransactionId: string | null;
   settlementTransactionId: string | null;
   cancelReason: string | null;
+  botId: string | null;
 }
 
 export function getBettingConfig(
@@ -678,12 +701,17 @@ export function listBets(
     status?: BetStatus;
     limit?: number;
     offset?: number;
+    botId?: string;
   } = {},
 ): Promise<{ items: Bet[] }> {
   const query = new URLSearchParams();
 
   if (params.status) {
     query.set('status', params.status);
+  }
+
+  if (params.botId) {
+    query.set('botId', params.botId);
   }
 
   if (params.limit) {
@@ -706,26 +734,106 @@ export function listBets(
 // ---- bots --------------------------------------------------------------
 
 export type BotStatus = 'inactive' | 'active' | 'strategy_unconfigured';
+export type StrategyCategory = 'dca' | 'momentum' | 'grid';
+export type StrategyRiskLevel = 'low' | 'medium' | 'high';
+export type BotLogLevel = 'info' | 'success' | 'skipped' | 'error';
+
+export interface StrategyFieldOption {
+  value: string;
+  label: string;
+}
+
+export interface StrategyConfigField {
+  key: string;
+  label: string;
+  type: 'instrument' | 'currency' | 'select' | 'stake' | 'duration' | 'number';
+  required: boolean;
+  options?: StrategyFieldOption[];
+  min?: number;
+  max?: number;
+  defaultValue?: number | string;
+  helpText?: string;
+}
+
+export interface StrategyCatalogEntry {
+  key: string;
+  name: string;
+  category: StrategyCategory;
+  description: string;
+  riskLevel: StrategyRiskLevel;
+  frequencyLabel: string;
+  configFields: StrategyConfigField[];
+  comingSoon?: boolean;
+}
+
+export interface BotStats {
+  totalExecutions: number;
+  totalTrades: number;
+  totalPnlMinorUnits: string;
+}
 
 export interface Bot {
   id: string;
   userId: string;
+  name: string;
   status: BotStatus;
   strategyKey: string | null;
+  config: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+  stats?: BotStats;
 }
 
-export function getBot(): Promise<Bot> {
-  return authedFetch('/bots/me');
+export interface BotSummary {
+  totalBots: number;
+  activeBots: number;
+  weeklyReturnPercent: number | null;
 }
 
-export function activateBot(): Promise<Bot> {
-  return authedFetch('/bots/me/activate', { method: 'POST' });
+export interface BotLog {
+  id: string;
+  botId: string;
+  occurredAt: string;
+  level: BotLogLevel;
+  message: string;
+  betId: string | null;
+  signal: Record<string, unknown> | null;
 }
 
-export function deactivateBot(): Promise<Bot> {
-  return authedFetch('/bots/me/deactivate', { method: 'POST' });
+export function getBotCatalog(): Promise<{ items: StrategyCatalogEntry[] }> {
+  return authedFetch('/bots/catalog');
+}
+
+export function listBots(): Promise<{ items: Bot[]; summary: BotSummary }> {
+  return authedFetch('/bots');
+}
+
+export function getBot(botId: string): Promise<Bot> {
+  return authedFetch(`/bots/${botId}`);
+}
+
+export function createBot(input: { name: string; strategyKey: string; config: Record<string, unknown> }): Promise<Bot> {
+  return authedFetch('/bots', { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function updateBot(botId: string, patch: { name?: string; config?: Record<string, unknown> }): Promise<Bot> {
+  return authedFetch(`/bots/${botId}`, { method: 'PATCH', body: JSON.stringify(patch) });
+}
+
+export function activateBot(botId: string): Promise<Bot> {
+  return authedFetch(`/bots/${botId}/activate`, { method: 'POST' });
+}
+
+export function deactivateBot(botId: string): Promise<Bot> {
+  return authedFetch(`/bots/${botId}/deactivate`, { method: 'POST' });
+}
+
+export function listBotLogs(botId: string, params: { limit?: number; offset?: number } = {}): Promise<{ items: BotLog[] }> {
+  const query = new URLSearchParams();
+  if (params.limit) query.set('limit', String(params.limit));
+  if (params.offset) query.set('offset', String(params.offset));
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return authedFetch(`/bots/${botId}/logs${suffix}`);
 }
 
 export function getBet(

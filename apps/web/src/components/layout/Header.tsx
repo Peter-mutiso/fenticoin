@@ -10,7 +10,7 @@ import { formatCurrencyMinorUnits } from '@/lib/money';
 import { Logo } from './Logo';
 
 export function Header() {
-  const { status } = useAuth();
+  const { status, isDemo } = useAuth();
   const balance = useWalletBalance();
 
   return (
@@ -20,6 +20,12 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
+        {status === 'authenticated' && isDemo && (
+          <span className="rounded-full bg-brand-500/15 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-brand-600">
+            Demo Mode
+          </span>
+        )}
+
         {status === 'authenticated' && (
           <div className="flex items-center gap-1.5 rounded-full bg-navy-950 py-2 pl-3 pr-3.5 text-white sm:pl-3.5 sm:pr-4">
             <Wallet className="h-4 w-4 text-brand-500" aria-hidden="true" />

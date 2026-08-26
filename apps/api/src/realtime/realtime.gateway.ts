@@ -190,6 +190,7 @@ export class RealtimeGateway
   @OnEvent('withdrawal.status_changed')
   @OnEvent('wallet.transaction_posted')
   @OnEvent('notification.new')
+  @OnEvent('demo.reset')
   broadcastPrivateEvent(event: RealtimeEvent): void {
     if (!event.userId) {
       return;

@@ -9,7 +9,7 @@ import { BalanceCard } from '@/components/wallet/BalanceCard';
 import { FeaturedInstruments } from './FeaturedInstruments';
 
 export function HomeDashboard() {
-  const { status: authStatus } = useAuth();
+  const { status: authStatus, isDemo } = useAuth();
   const balance = useWalletBalance();
 
   return (
@@ -17,7 +17,13 @@ export function HomeDashboard() {
       {authStatus === 'authenticated' ? (
         <div className="space-y-4">
           {balance.data && (
-            <BalanceCard availableMinorUnits={balance.data.availableMinorUnits} lockedMinorUnits={balance.data.lockedMinorUnits} currency={balance.data.currency} showLocked />
+            <BalanceCard
+              availableMinorUnits={balance.data.availableMinorUnits}
+              lockedMinorUnits={balance.data.lockedMinorUnits}
+              currency={balance.data.currency}
+              showLocked
+              isDemo={isDemo}
+            />
           )}
         </div>
       ) : (

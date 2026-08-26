@@ -59,6 +59,33 @@ describe('ReportsService', () => {
       expect(result.byCurrency).toEqual([]);
     });
 
+    it('excludes demo accounts from revenue — the query itself joins to users and filters accountType != demo', async () => {
+      // The mock can't verify the SQL WHERE clause directly, but it does let
+      // us assert the query builder actually performs the join this
+      // exclusion depends on, so a future refactor that silently drops it
+      // fails this test rather than just under-filtering silently.
+      interface Chain {
+        from: jest.Mock<Chain, []>;
+        innerJoin: jest.Mock<Chain, unknown[]>;
+        where: jest.Mock<Chain, unknown[]>;
+        groupBy: jest.Mock<Promise<unknown[]>, []>;
+      }
+      const chain: Chain = {
+        from: jest.fn(() => chain),
+        innerJoin: jest.fn(() => chain),
+        where: jest.fn(() => chain),
+        groupBy: jest.fn(() => Promise.resolve([])),
+      };
+      const innerJoin = chain.innerJoin;
+      const select = jest.fn(() => chain);
+      const db = { select } as unknown as DrizzleDb;
+      const service = new ReportsService(db);
+
+      await service.revenue(new Date('2026-01-01'), new Date('2026-01-31'));
+
+      expect(innerJoin).toHaveBeenCalled();
+    });
+
     it('keeps multiple currencies independent — never sums across them', async () => {
       const select = jest.fn().mockReturnValue(
         chainable([

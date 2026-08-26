@@ -15,7 +15,7 @@ import { BalanceCard } from '@/components/wallet/BalanceCard';
 import { PerformanceSummary } from './PerformanceSummary';
 
 export function PortfolioView() {
-  const { status: authStatus } = useAuth();
+  const { status: authStatus, isDemo } = useAuth();
   const enabled = authStatus === 'authenticated';
 
   const walletQuery = useQuery({ queryKey: ['wallet', 'USD'], queryFn: () => getWallet('USD'), enabled });
@@ -45,7 +45,13 @@ export function PortfolioView() {
   return (
     <div className="space-y-6">
       {walletQuery.data ? (
-        <BalanceCard availableMinorUnits={walletQuery.data.availableMinorUnits} lockedMinorUnits={walletQuery.data.lockedMinorUnits} currency={walletQuery.data.currency} showLocked />
+        <BalanceCard
+          availableMinorUnits={walletQuery.data.availableMinorUnits}
+          lockedMinorUnits={walletQuery.data.lockedMinorUnits}
+          currency={walletQuery.data.currency}
+          showLocked
+          isDemo={isDemo}
+        />
       ) : walletQuery.error ? (
         <Notice text={describeApiError(walletQuery.error).title} />
       ) : (

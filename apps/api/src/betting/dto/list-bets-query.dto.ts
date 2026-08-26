@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 
 const BET_STATUSES = ['pending', 'open', 'won', 'lost', 'void', 'cancelled', 'refunded', 'disputed'] as const;
 
@@ -7,6 +7,10 @@ export class ListBetsQueryDto {
   @IsOptional()
   @IsIn(BET_STATUSES)
   status?: (typeof BET_STATUSES)[number];
+
+  @IsOptional()
+  @IsUUID()
+  botId?: string;
 
   @IsOptional()
   @Type(() => Number)

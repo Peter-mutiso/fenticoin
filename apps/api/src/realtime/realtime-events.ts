@@ -105,6 +105,25 @@ export function buildMarketPriceEvent(quote: PriceQuote): RealtimeEvent<MarketPr
   };
 }
 
+/**
+ * Announces that a demo account's own history/wallet/bots were just wiped
+ * and re-funded by `DemoService.resetDemo`. Unlike every other private
+ * event, there's no single row to derive an id/occurredAt from — the
+ * "entity" is the whole account — so both are synthesized from the reset
+ * moment itself.
+ */
+export function buildDemoResetEvent(demoUserId: string): RealtimeEvent {
+  const occurredAt = new Date().toISOString();
+  return {
+    id: `demo-reset:${demoUserId}:${occurredAt}`,
+    type: 'demo.reset',
+    entityId: demoUserId,
+    userId: demoUserId,
+    occurredAt,
+    payload: {},
+  };
+}
+
 export function buildNotificationEvent(source: RealtimeEvent): RealtimeEvent {
   return {
     id: `notification:${source.id}`,

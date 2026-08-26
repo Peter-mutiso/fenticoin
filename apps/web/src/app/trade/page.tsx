@@ -10,6 +10,7 @@ import { listInstruments, getPrice, getBettingConfig, placeBet } from '@/lib/api
 import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { describeApiError } from '@/lib/api-errors';
+import { parseStakeToMinorUnits } from '@/lib/money';
 import { Notice } from '@/components/ui/Notice';
 
 export default function TradePage() {
@@ -47,19 +48,23 @@ export default function TradePage() {
   // Place Bet Mutation with detailed error extraction
   const placeBetMutation = useMutation({
     mutationFn: async () => {
-      const stakeNumber = parseFloat(stake);
-      if (isNaN(stakeNumber) || stakeNumber <= 0) {
+      const currency = selectedInstrument?.quoteCurrency ?? 'USD';
+      let stakeMinorUnits: bigint;
+      try {
+        stakeMinorUnits = parseStakeToMinorUnits(stake, currency);
+      } catch {
         throw new Error('Please enter a valid stake amount.');
       }
-      // Convert to minor units (cents) as required by standard trading ledger systems
-      const stakeMinorUnits = Math.round(stakeNumber * 100).toString();
-      
+      if (stakeMinorUnits <= 0n) {
+        throw new Error('Please enter a valid stake amount.');
+      }
+
       return placeBet({
         instrumentId: selectedInstrumentId,
         type: 'rise_fall',
         selection: direction,
-        stakeAmount: stakeMinorUnits,
-        currency: selectedInstrument?.quoteCurrency ?? '',
+        stakeAmount: stakeMinorUnits.toString(),
+        currency,
         durationSeconds: duration,
       });
     },
@@ -71,7 +76,6 @@ export default function TradePage() {
       
       // Invalidate relevant caches to instantly refresh balances and open portfolio positions
       queryClient.invalidateQueries({ queryKey: ['wallet'] });
-      queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
       queryClient.invalidateQueries({ queryKey: ['bets'] });
 
       setTimeout(() => setSuccessNotice(false), 5000);

@@ -56,7 +56,7 @@ function authenticate() {
   storeSession({
     accessToken: 'access-1',
     refreshToken: 'refresh-1',
-    user: { id: 'user-1', email: 'trader@example.com', status: 'active', kycStatus: 'pending', emailVerifiedAt: '2026-01-01T00:00:00.000Z', phoneVerifiedAt: null },
+    user: { id: 'user-1', email: 'trader@example.com', status: 'active', kycStatus: 'pending', emailVerifiedAt: '2026-01-01T00:00:00.000Z', phoneVerifiedAt: null, accountType: 'real', demoOfUserId: null },
   });
   mockGetMe.mockResolvedValue({ id: 'user-1', email: 'trader@example.com', status: 'active', sessionId: 's1', roles: [], permissions: [] });
 }
@@ -69,6 +69,10 @@ describe('AccountPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     window.localStorage.clear();
+    // `clearAllMocks` resets call history but not implementations set via `.mockResolvedValue` in
+    // an earlier test — without a fresh default here, a test that never calls `authenticate()`
+    // would inherit an earlier test's resolved user and incorrectly appear logged in.
+    mockGetMe.mockRejectedValue(new Error('Unauthorized'));
     mockListBets.mockResolvedValue({ items: [] });
     mockListDeposits.mockResolvedValue({ items: [] });
     mockListWithdrawals.mockResolvedValue({ items: [] });

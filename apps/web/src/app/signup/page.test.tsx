@@ -84,7 +84,7 @@ describe('SignupPage', () => {
     mockRegister.mockResolvedValue({
       accessToken: 'a',
       refreshToken: 'r',
-      user: { id: 'u1', email: 'new@example.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null },
+      user: { id: 'u1', email: 'new@example.com', status: 'active', kycStatus: 'unverified', emailVerifiedAt: null, phoneVerifiedAt: null, accountType: 'real', demoOfUserId: null },
     });
 
     renderPage();

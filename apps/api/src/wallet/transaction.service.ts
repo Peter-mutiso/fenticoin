@@ -479,14 +479,23 @@ export class TransactionService {
     });
   }
 
-  async adjustBalance(input: AdjustBalanceInput): Promise<Transaction> {
+  /**
+   * `externalTx`, when supplied, participates in a caller-owned transaction
+   * (e.g. `DemoService.resetDemo` composing this with its own deletions)
+   * instead of opening its own — mirrors `deposit`/`placeBet`/`refundBet`
+   * above. In that case the caller is responsible for emitting any
+   * realtime event once its own transaction actually commits, since
+   * emitting here would risk announcing a change a later statement in the
+   * caller's transaction could still roll back.
+   */
+  async adjustBalance(input: AdjustBalanceInput, externalTx?: DrizzleDb): Promise<Transaction> {
     this.assertPositiveAmount(input.amount);
     if (!input.reason?.trim()) {
       throw new BadRequestException('A reason is required for manual balance adjustments');
     }
     const currency = requireCurrency(input.currency);
 
-    return this.withIdempotency(input.idempotencyKey, async (tx) => {
+    const run = async (tx: DrizzleDb) => {
       const accounts = await this.walletService.getOrCreateWalletAccounts(tx, input.userId, currency.code);
 
       const txRow = await this.insertTransactionRow(tx, {
@@ -519,7 +528,13 @@ export class TransactionService {
       await this.ledgerService.postEntries(tx, txRow.id, currency.code, entries);
 
       return txRow;
-    }).then((txRow) => {
+    };
+
+    if (externalTx) {
+      return this.withIdempotency(input.idempotencyKey, run, externalTx);
+    }
+
+    return this.withIdempotency(input.idempotencyKey, run).then((txRow) => {
       this.emitWalletEvent(txRow);
       return txRow;
     });

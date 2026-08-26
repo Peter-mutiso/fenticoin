@@ -16,7 +16,7 @@ import { useToast } from '@/components/ui/Toast';
 import { DEPOSIT_STATUS_STYLES } from './payment-display';
 
 export function DepositForm() {
-  const { status: authStatus } = useAuth();
+  const { status: authStatus, isDemo } = useAuth();
   const { show } = useToast();
   const queryClient = useQueryClient();
 
@@ -72,6 +72,10 @@ export function DepositForm() {
         </Link>
       </div>
     );
+  }
+
+  if (isDemo) {
+    return <Notice tone="info" text="Demo accounts use virtual funds. Real-money deposits are unavailable in Demo Mode." />;
   }
 
   return (

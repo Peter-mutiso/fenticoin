@@ -13,7 +13,8 @@ import { AdjustBalanceForm } from '@/components/finance/AdjustBalanceForm';
 
 export function UserWalletTab({ userId }: { userId: string }) {
   const [currency, setCurrency] = useState(SUPPORTED_CURRENCY_CODES[0] ?? 'USD');
-  const balanceQuery = useQuery({ queryKey: ['wallet', userId, currency], queryFn: () => getWalletBalance(userId, currency) });
+  // No realtime relay covers wallet changes on the admin socket yet — poll as a fallback, matching the convention used by DepositsList/WithdrawalsList/RiskQueue.
+  const balanceQuery = useQuery({ queryKey: ['wallet', userId, currency], queryFn: () => getWalletBalance(userId, currency), refetchInterval: 30_000 });
 
   return (
     <div className="space-y-4">

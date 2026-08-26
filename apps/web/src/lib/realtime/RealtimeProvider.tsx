@@ -27,11 +27,14 @@ const RECONNECT_INVALIDATION_KEYS: QueryKey[] = [
   ['wallet'],
   ['bets', 'recent'],
   ['bets', 'portfolio'],
+  ['bets', 'history'],
   ['deposits', 'recent'],
   ['withdrawals', 'recent'],
   ['instruments'],
   ['instrument'],
   ['price'],
+  ['bot'],
+  ['bots'],
 ];
 
 /**
@@ -50,9 +53,9 @@ const RECONNECT_INVALIDATION_KEYS: QueryKey[] = [
 function invalidationKeysFor(event: RealtimeEvent): QueryKey[] {
   switch (event.type) {
     case 'bet.updated':
-      return [['bets', 'recent'], ['bets', 'portfolio'], ['bet', event.entityId]];
+      return [['bets', 'recent'], ['bets', 'portfolio'], ['bets', 'history'], ['bet', event.entityId], ['bot'], ['bots']];
     case 'bet.settled':
-      return [['bets', 'recent'], ['bets', 'portfolio'], ['bet', event.entityId], ['wallet']];
+      return [['bets', 'recent'], ['bets', 'portfolio'], ['bets', 'history'], ['bet', event.entityId], ['wallet'], ['bot'], ['bots']];
     case 'deposit.status_changed':
       return event.terminal ? [['deposits', 'recent'], ['wallet']] : [['deposits', 'recent']];
     case 'withdrawal.status_changed':
@@ -68,6 +71,11 @@ function invalidationKeysFor(event: RealtimeEvent): QueryKey[] {
       // bet/deposit/withdrawal invalidation above happen sooner, which
       // already covers it.
       return [];
+    case 'demo.reset':
+      // The whole account's history/wallet/bots were just wiped and
+      // re-funded — refetch everything a reset touches, same set as the
+      // reconnect full-resync list.
+      return [['wallet'], ['wallet-transactions'], ['bets', 'recent'], ['bets', 'portfolio'], ['bets', 'history'], ['bot'], ['bots']];
     default:
       return [];
   }
@@ -82,6 +90,7 @@ const SUBSCRIBABLE_EVENT_TYPES: RealtimeEventType[] = [
   'notification.new',
   'market.status',
   'market.price',
+  'demo.reset',
 ];
 
 const SEEN_EVENT_CAP = 500;

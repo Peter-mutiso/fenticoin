@@ -13,6 +13,7 @@ import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BettingModule } from './betting/betting.module';
 import { BotsModule } from './bots/bots.module';
+import { DemoModule } from './demo/demo.module';
 import { AuthorizationModule } from './authorization/authorization.module';
 import { AuthGuard } from './authorization/guards/auth.guard';
 import { PermissionsGuard } from './authorization/guards/permissions.guard';
@@ -72,6 +73,7 @@ import { WalletModule } from './wallet/wallet.module';
     MarketsModule,
     BettingModule,
     BotsModule,
+    DemoModule,
     PaymentsModule,
     ReportsModule,
     RealtimeModule,

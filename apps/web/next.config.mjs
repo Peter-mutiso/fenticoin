@@ -9,9 +9,23 @@ const scriptSrc = [
   ...(isDevelopment ? ["'unsafe-eval'"] : []),
 ];
 
+// The realtime layer (`RealtimeProvider`) opens a WebSocket to the same API
+// host — `connect-src` sources are scheme-sensitive, so an `http(s)://`
+// entry alone does not also permit a `ws(s)://` connection to that same
+// host, even though it's the identical origin's API. Without the
+// WebSocket-scheme sibling here, every socket connection attempt is
+// silently blocked by CSP, which then drives the client into a permanent
+// reconnect loop (masking itself as "realtime just isn't connecting").
+const apiWebSocketUrl = apiUrl?.startsWith('https://')
+  ? `wss://${apiUrl.slice('https://'.length)}`
+  : apiUrl?.startsWith('http://')
+    ? `ws://${apiUrl.slice('http://'.length)}`
+    : undefined;
+
 const connectSrc = [
   "'self'",
   ...(apiUrl ? [apiUrl] : []),
+  ...(apiWebSocketUrl ? [apiWebSocketUrl] : []),
 ];
 
 const securityHeaders = [

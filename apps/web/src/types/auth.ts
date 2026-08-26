@@ -6,6 +6,9 @@ export interface PublicUser {
   kycStatus: string;
   emailVerifiedAt: string | null;
   phoneVerifiedAt: string | null;
+  /** `'demo'` for a server-provisioned demo shadow account — see `AccountMenu`/`Header`'s Demo Mode indicator. */
+  accountType: 'real' | 'demo';
+  demoOfUserId: string | null;
 }
 
 /** Mirrors `AuthResult` — a successful login/register/refresh response. */

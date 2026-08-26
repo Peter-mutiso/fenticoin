@@ -49,6 +49,8 @@ export interface PublicUser {
   kycStatus: string;
   emailVerifiedAt: Date | null;
   phoneVerifiedAt: Date | null;
+  accountType: 'real' | 'demo';
+  demoOfUserId: string | null;
 }
 
 export interface AuthResult {
@@ -67,7 +69,7 @@ const EMAIL_VERIFICATION_TTL_MINUTES = 60 * 24;
 const PASSWORD_RESET_TTL_MINUTES = 30;
 const PHONE_OTP_TTL_MINUTES = 10;
 
-function toPublicUser(user: User): PublicUser {
+export function toPublicUser(user: User): PublicUser {
   return {
     id: user.id,
     email: user.email,
@@ -75,6 +77,8 @@ function toPublicUser(user: User): PublicUser {
     kycStatus: user.kycStatus,
     emailVerifiedAt: user.emailVerifiedAt,
     phoneVerifiedAt: user.phoneVerifiedAt,
+    accountType: user.accountType,
+    demoOfUserId: user.demoOfUserId,
   };
 }
 

@@ -14,6 +14,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { betResultEnum, betStatusEnum, betTypeEnum, settlementOutcomeEnum } from './enums';
+import { bots } from './bots';
 import { instruments } from './markets';
 import { users } from './users';
 import { transactions } from './wallet';
@@ -115,12 +116,19 @@ export const bets = pgTable(
     }),
     idempotencyKey: varchar('idempotency_key', { length: 128 }),
     cancelReason: text('cancel_reason'),
+    // Set only when this bet was placed by `BotExecutionService` on a
+    // user's behalf, rather than directly by the user — purely an
+    // attribution link for the bots UI (recent trades / P&L per bot); the
+    // bet's own fields are otherwise identical either way, and settlement
+    // never treats a bot-attributed bet differently.
+    botId: uuid('bot_id').references(() => bots.id, { onDelete: 'restrict' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex('bets_idempotency_key_idx').on(table.idempotencyKey).where(sql`${table.idempotencyKey} IS NOT NULL`),
     index('bets_user_id_created_at_idx').on(table.userId, table.createdAt),
+    index('bets_bot_id_idx').on(table.botId),
     index('bets_instrument_id_status_idx').on(table.instrumentId, table.status),
     // What the settlement scheduler polls: "which open bets are due".
     index('bets_status_expires_at_idx').on(table.status, table.expiresAt),

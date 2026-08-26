@@ -127,6 +127,9 @@ export function UserDetailView({ userId, initialTab }: { userId: string; initial
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {user.accountType === 'demo' && (
+              <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-brand-600">Demo</span>
+            )}
             <StatusBadge status={user.status} styles={ACCOUNT_STATUS_STYLES} />
             <StatusBadge status={user.kycStatus} styles={KYC_STATUS_STYLES} />
             <StatusBadge status={user.eligibilityStatus} styles={ELIGIBILITY_STATUS_STYLES} />

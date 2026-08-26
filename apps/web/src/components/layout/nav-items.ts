@@ -14,7 +14,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Home', icon: Home, href: '/dashboard' },
   { id: 'markets', label: 'Markets', icon: TrendingUp, href: '/markets' },
   { id: 'trade', label: 'Trade', icon: LineChart, primary: true, href: '/trade' },
-  { id: 'bot', label: 'Bot', icon: Bot, href: '/bot' },
+  { id: 'bot', label: 'Bots', icon: Bot, href: '/bots' },
   { id: 'portfolio', label: 'Portfolio', icon: Briefcase, href: '/portfolio' },
   { id: 'history', label: 'History', icon: Clock, href: '/bet-history' },
   { id: 'transactions', label: 'Transactions', icon: Receipt, href: '/transactions' },

@@ -9,6 +9,7 @@ function user(overrides: Partial<User> = {}): User {
     status: 'active',
     eligibilityStatus: 'eligible',
     kycStatus: 'unverified',
+    accountType: 'real',
     ...overrides,
   } as User;
 }
@@ -27,5 +28,9 @@ describe('DepositEligibilityService', () => {
 
   it('rejects an ineligible account', () => {
     expect(() => service.assertCanDeposit(user({ eligibilityStatus: 'ineligible' }))).toThrow(ForbiddenException);
+  });
+
+  it('rejects a demo account regardless of status/eligibility/KYC', () => {
+    expect(() => service.assertCanDeposit(user({ accountType: 'demo' }))).toThrow(ForbiddenException);
   });
 });

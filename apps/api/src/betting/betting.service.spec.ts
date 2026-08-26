@@ -32,6 +32,8 @@ function user(overrides: Partial<User> = {}): User {
     kycStatus: 'unverified',
     eligibilityStatus: 'eligible',
     dateOfBirth: null,
+    accountType: 'real',
+    demoOfUserId: null,
     createdAt: NOW,
     updatedAt: NOW,
     ...overrides,

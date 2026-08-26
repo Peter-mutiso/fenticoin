@@ -35,6 +35,8 @@ const targetUser = {
   kycStatus: 'pending' as const,
   eligibilityStatus: 'eligible' as const,
   dateOfBirth: null,
+  accountType: 'real' as const,
+  demoOfUserId: null,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -68,6 +70,15 @@ describe('UserDetailView — frontend RBAC gating', () => {
     expect(screen.queryByRole('button', { name: /suspend account/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /restrict betting/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /approve kyc/i })).not.toBeInTheDocument();
+  });
+
+  it('badges a demo shadow account in the detail header so it is never mistaken for real activity', async () => {
+    authenticateAs(['users.view']);
+    mockGetUser.mockResolvedValue({ ...targetUser, accountType: 'demo' as const, demoOfUserId: 'real-user-1' });
+    renderView();
+
+    await screen.findByText('trader@example.com');
+    expect(screen.getByText('Demo')).toBeInTheDocument();
   });
 
   it('a risk-role admin (users.suspend + kyc.review) sees exactly those actions', async () => {

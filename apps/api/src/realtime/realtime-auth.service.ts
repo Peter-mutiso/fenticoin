@@ -54,6 +54,8 @@ export class RealtimeAuthService {
       sessionId: session.id,
       roles,
       permissions,
+      accountType: user.accountType,
+      demoOfUserId: user.demoOfUserId,
     };
   }
 

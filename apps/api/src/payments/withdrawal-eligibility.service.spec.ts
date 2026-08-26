@@ -9,6 +9,7 @@ function user(overrides: Partial<User> = {}): User {
     status: 'active',
     eligibilityStatus: 'eligible',
     kycStatus: 'approved',
+    accountType: 'real',
     ...overrides,
   } as User;
 }
@@ -32,5 +33,9 @@ describe('WithdrawalEligibilityService', () => {
     expect(() => service.assertCanWithdraw(user({ kycStatus: 'unverified' }))).toThrow(ForbiddenException);
     expect(() => service.assertCanWithdraw(user({ kycStatus: 'pending' }))).toThrow(ForbiddenException);
     expect(() => service.assertCanWithdraw(user({ kycStatus: 'rejected' }))).toThrow(ForbiddenException);
+  });
+
+  it('rejects a demo account regardless of status/eligibility/KYC', () => {
+    expect(() => service.assertCanWithdraw(user({ accountType: 'demo' }))).toThrow(ForbiddenException);
   });
 });

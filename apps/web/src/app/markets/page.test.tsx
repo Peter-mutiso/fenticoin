@@ -8,7 +8,7 @@ const instrumentBtc = {
   id: 'inst-btc',
   symbol: 'BTC',
   quoteCurrency: 'USD',
-  displaySymbol: 'BTC/USD',
+  displaySymbol: 'BTC / USD',
   name: 'Bitcoin',
   categoryKey: 'crypto',
   pricePrecision: 2,
@@ -20,13 +20,14 @@ const instrumentEth = {
   ...instrumentBtc,
   id: 'inst-eth',
   symbol: 'ETH',
-  displaySymbol: 'ETH/USD',
+  displaySymbol: 'ETH / USD',
   name: 'Ethereum',
 };
 
 const mockListInstruments = jest.fn();
 const mockListMarketCategories = jest.fn();
 const mockGetPrice = jest.fn();
+const mockGetMe = jest.fn();
 
 jest.mock('@/lib/api-client', () => {
   const actual = jest.requireActual('@/lib/api-client');
@@ -35,6 +36,10 @@ jest.mock('@/lib/api-client', () => {
     listInstruments: (...args: unknown[]) => mockListInstruments(...args),
     listMarketCategories: (...args: unknown[]) => mockListMarketCategories(...args),
     getPrice: (...args: unknown[]) => mockGetPrice(...args),
+    // `/markets` is public and renders regardless of auth status, but `AuthProvider` still
+    // unconditionally calls `getMe()` on mount to validate any stored session — leaving this
+    // unmocked lets it fall through to a real network call in the test environment.
+    getMe: (...args: unknown[]) => mockGetMe(...args),
   };
 });
 
@@ -45,6 +50,7 @@ function renderPage() {
 describe('MarketsPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetMe.mockRejectedValue(new Error('Unauthorized'));
     mockListInstruments.mockResolvedValue({ items: [instrumentBtc, instrumentEth] });
     mockListMarketCategories.mockResolvedValue({ items: [] });
     mockGetPrice.mockResolvedValue({
@@ -61,24 +67,24 @@ describe('MarketsPage', () => {
 
   it('lists available instruments', async () => {
     renderPage();
-    expect(await screen.findByText('BTC/USD')).toBeInTheDocument();
-    expect(screen.getByText('ETH/USD')).toBeInTheDocument();
+    expect(await screen.findByText('BTC / USD')).toBeInTheDocument();
+    expect(screen.getByText('ETH / USD')).toBeInTheDocument();
   });
 
   it('filters by search term client-side', async () => {
     renderPage();
-    await screen.findByText('BTC/USD');
+    await screen.findByText('BTC / USD');
 
     const search = screen.getByLabelText(/search markets/i);
     await userEvent.type(search, 'ether');
 
-    expect(screen.queryByText('BTC/USD')).not.toBeInTheDocument();
-    expect(screen.getByText('ETH/USD')).toBeInTheDocument();
+    expect(screen.queryByText('BTC / USD')).not.toBeInTheDocument();
+    expect(screen.getByText('ETH / USD')).toBeInTheDocument();
   });
 
   it('shows an empty state when nothing matches the search', async () => {
     renderPage();
-    await screen.findByText('BTC/USD');
+    await screen.findByText('BTC / USD');
 
     const search = screen.getByLabelText(/search markets/i);
     await userEvent.type(search, 'nonexistent-market-xyz');

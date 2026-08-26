@@ -84,4 +84,12 @@ export class AppConfigService {
   get coinGeckoApiKey(): string | undefined {
     return this.get('COINGECKO_API_KEY');
   }
+
+  get demoInitialBalanceMinorUnits(): number {
+    return this.get('DEMO_INITIAL_BALANCE_MINOR_UNITS');
+  }
+
+  get demoCurrency(): string {
+    return this.get('DEMO_CURRENCY');
+  }
 }

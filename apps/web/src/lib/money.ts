@@ -21,6 +21,12 @@ export function formatCurrencyMinorUnits(minorUnits: string, currencyCode: strin
   return currencyCode === 'USD' ? `$${decimal}` : `${decimal} ${currencyCode}`;
 }
 
+/** Bare decimal string (no currency symbol), for pre-filling an editable amount input from a persisted minor-units value — e.g. "12.50". */
+export function minorUnitsToDecimalString(minorUnits: string, currencyCode: string): string {
+  const currency = KNOWN_CURRENCIES[currencyCode] ?? { code: currencyCode, decimals: 2 };
+  return Money.fromMinorUnits(BigInt(minorUnits), currency).toDecimalString();
+}
+
 /** Formats an instrument-precision-scaled price (entry/settlement price) for display — precision comes from the instrument, not the currency. */
 export function formatInstrumentPrice(minorUnits: string, pricePrecision: number, currencyCode: string): string {
   const decimal = Money.fromMinorUnits(BigInt(minorUnits), { code: currencyCode, decimals: pricePrecision }).toDecimalString();

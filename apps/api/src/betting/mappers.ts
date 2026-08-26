@@ -24,6 +24,7 @@ export function serializeBet(bet: Bet) {
     placementTransactionId: bet.placementTransactionId,
     settlementTransactionId: bet.settlementTransactionId,
     cancelReason: bet.cancelReason,
+    botId: bet.botId,
   };
 }
 

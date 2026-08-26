@@ -23,8 +23,8 @@ import { RealtimeGateway } from './realtime.gateway';
  * is under test here.
  */
 
-const USER_A: RequestUser = { id: 'user-a', email: 'a@example.com', status: 'active', sessionId: 'sess-a', roles: ['user'], permissions: [] };
-const USER_B: RequestUser = { id: 'user-b', email: 'b@example.com', status: 'active', sessionId: 'sess-b', roles: ['user'], permissions: [] };
+const USER_A: RequestUser = { id: 'user-a', email: 'a@example.com', status: 'active', sessionId: 'sess-a', roles: ['user'], permissions: [], accountType: 'real', demoOfUserId: null };
+const USER_B: RequestUser = { id: 'user-b', email: 'b@example.com', status: 'active', sessionId: 'sess-b', roles: ['user'], permissions: [], accountType: 'real', demoOfUserId: null };
 const ADMIN_REPORTS_ONLY: RequestUser = {
   id: 'admin-1',
   email: 'admin@example.com',
@@ -32,6 +32,8 @@ const ADMIN_REPORTS_ONLY: RequestUser = {
   sessionId: 'sess-admin',
   roles: ['support'],
   permissions: ['reports.view'],
+  accountType: 'real',
+  demoOfUserId: null,
 };
 const NO_ADMIN_ACCESS: RequestUser = {
   id: 'user-c',
@@ -40,6 +42,8 @@ const NO_ADMIN_ACCESS: RequestUser = {
   sessionId: 'sess-c',
   roles: ['user'],
   permissions: [],
+  accountType: 'real',
+  demoOfUserId: null,
 };
 
 const TOKENS: Record<string, RequestUser> = {

@@ -191,6 +191,9 @@ export interface AdminUser {
   kycStatus: KycStatus;
   eligibilityStatus: EligibilityStatus;
   dateOfBirth: string | null;
+  /** `'demo'` for a server-provisioned demo shadow account — see `DemoBadge`. Never counted in revenue/user-count reporting. */
+  accountType: 'real' | 'demo';
+  demoOfUserId: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -26,6 +26,10 @@ describe('VerifyEmailPage', () => {
     jest.clearAllMocks();
     window.localStorage.clear();
     searchParams = new URLSearchParams();
+    // Without an explicit rejection, this unconfigured mock resolves to `undefined` (not a
+    // throw), which `AuthProvider` treats as a successful `getMe()` call and incorrectly
+    // reports `status: 'authenticated'` for every test in this file.
+    mockGetMe.mockRejectedValue(new Error('Unauthorized'));
   });
 
   it('shows a missing-token state when the URL has no token', async () => {
