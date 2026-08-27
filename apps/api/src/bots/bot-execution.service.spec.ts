@@ -7,11 +7,12 @@ describe('BotExecutionService', () => {
     return { from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue(value) }) }) };
   }
 
-  function makeService(strategy: object | undefined, existingBetForKey: unknown[] = []) {
+  function makeService(strategy: object | undefined, existingBetForKey: unknown[] = [], existingLogForBet: unknown[] = []) {
     const selectMock = jest
       .fn()
       .mockReturnValueOnce(chainResolving([bot]))
-      .mockReturnValueOnce(chainResolving(existingBetForKey));
+      .mockReturnValueOnce(chainResolving(existingBetForKey))
+      .mockReturnValueOnce(chainResolving(existingLogForBet));
     const db = { select: selectMock, insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }) };
     const bettingService = { placeBet: jest.fn().mockResolvedValue({ id: 'bet-1' }) };
     const auditLog = { record: jest.fn() };
@@ -60,6 +61,18 @@ describe('BotExecutionService', () => {
     const h = makeService(strategy, [{ id: 'bet-existing' }]);
     expect(await h.service.execute('bot-1')).toBe(false);
     expect(h.bettingService.placeBet).not.toHaveBeenCalled();
+  });
+
+  it('never writes a second "Placed" log for a bet that placeBet returned as an idempotent replay (an overlapping evaluation racing the pre-check)', async () => {
+    const strategy = { key: 'future', evaluate: jest.fn().mockResolvedValue(signal) };
+    // The pre-check (by idempotencyKey) found nothing, so we proceed to placeBet — but
+    // placeBet itself returns a bet that another, concurrent execute() already logged.
+    const h = makeService(strategy, [], [{ id: 'log-existing' }]);
+
+    expect(await h.service.execute('bot-1')).toBe(true);
+    expect(h.bettingService.placeBet).toHaveBeenCalled();
+    expect(h.db.insert).not.toHaveBeenCalled(); // no new log row, no duplicate audit entry
+    expect(h.auditLog.record).not.toHaveBeenCalled();
   });
 
   it('logs an error and does not throw when placeBet fails', async () => {

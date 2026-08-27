@@ -55,14 +55,28 @@ export class BotExecutionService {
         botId: bot.id,
         idempotencyKey,
       });
-      await this.writeLog(bot.id, 'success', `Placed a ${signal.type} bet (${signal.selection}).`, bet.id, serializeSignal(signal));
-      await this.auditLog.record({
-        actorUserId: bot.userId,
-        action: 'bot.bet_placed',
-        targetType: 'bot',
-        targetId: bot.id,
-        after: { betId: bet.id, strategyKey: bot.strategyKey },
-      });
+      // `placeBet` is itself idempotent on `idempotencyKey` (see
+      // `BettingService.placeBet`'s own pre-check + unique-violation
+      // fallback) — a genuine safety net for the narrow race where two
+      // `execute()` calls for the same bot overlap (e.g. a slow evaluation
+      // still in flight when the next scheduler tick fires) and both pass
+      // the pre-check above before either has committed a bet. When that
+      // happens, `placeBet` correctly returns the *same* bet to both
+      // callers rather than placing it twice — but without this check we'd
+      // still write two "Placed a bet" log rows for one real trade,
+      // misrepresenting the bot's own history. Only the call that actually
+      // created the log for this bet gets to log it.
+      const [existingLog] = await this.db.select({ id: tradingBotLogs.id }).from(tradingBotLogs).where(eq(tradingBotLogs.betId, bet.id)).limit(1);
+      if (!existingLog) {
+        await this.writeLog(bot.id, 'success', `Placed a ${signal.type} bet (${signal.selection}).`, bet.id, serializeSignal(signal));
+        await this.auditLog.record({
+          actorUserId: bot.userId,
+          action: 'bot.bet_placed',
+          targetType: 'bot',
+          targetId: bot.id,
+          after: { betId: bet.id, strategyKey: bot.strategyKey },
+        });
+      }
       return true;
     } catch (error) {
       await this.writeLog(bot.id, 'error', `Bet placement failed: ${describeError(error)}`, undefined, serializeSignal(signal));
