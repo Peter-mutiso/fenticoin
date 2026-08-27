@@ -5,12 +5,18 @@ import { Bot as BotIcon, Plus, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
-import { getBotCatalog, listBots, type Bot, type StrategyCatalogEntry, type StrategyCategory } from '@/lib/api-client';
+import { formatExecutionInterval, getBotCatalog, listBots, type Bot, type BotPreset, type StrategyCatalogEntry, type StrategyCategory } from '@/lib/api-client';
 import { describeApiError } from '@/lib/api-errors';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { formatCurrencyMinorUnits } from '@/lib/money';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Notice } from '@/components/ui/Notice';
+
+const RISK_STYLES: Record<string, string> = {
+  low: 'bg-brand-50 text-brand-600',
+  medium: 'bg-amber-50 text-amber-700',
+  high: 'bg-loss-50 text-loss-500',
+};
 
 const CATEGORY_LABELS: Record<StrategyCategory, string> = {
   dca: 'Dollar-Cost Averaging',
@@ -39,6 +45,7 @@ export function BotsBrowser() {
 
   const { items: bots, summary } = botsQuery.data!;
   const catalog = catalogQuery.data!.items;
+  const presets = catalogQuery.data!.presets;
   const strategyByKey = new Map(catalog.map((entry) => [entry.key, entry]));
 
   const categoriesPresent = CATEGORY_ORDER.filter((cat) => catalog.some((entry) => entry.category === cat));
@@ -78,6 +85,20 @@ export function BotsBrowser() {
           </div>
         </dl>
       </div>
+
+      {presets.length > 0 && (
+        <section aria-labelledby="recommended-bots-heading">
+          <h2 id="recommended-bots-heading" className="text-sm font-bold text-neutral-900">Recommended bots</h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Pre-configured starting points for our real strategies below — every card runs the same deterministic, server-side engine as a bot built from scratch.
+          </p>
+          <div className="mt-3 flex snap-x gap-3 overflow-x-auto pb-2">
+            {presets.map((preset) => (
+              <PresetCard key={preset.key} preset={preset} strategyName={strategyByKey.get(preset.strategyKey)?.name} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {categoriesPresent.map((cat) => (
@@ -124,6 +145,30 @@ export function BotsBrowser() {
   );
 }
 
+/** A "Recommended Bots" marketplace card — a named preset of a real strategy, never a fabricated one. See `bot-presets.ts`. */
+function PresetCard({ preset, strategyName }: { preset: BotPreset; strategyName?: string }) {
+  return (
+    <div className="w-64 shrink-0 snap-start rounded-2xl border border-neutral-200 bg-white p-4">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-bold text-neutral-900">{preset.name}</p>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold capitalize ${RISK_STYLES[preset.riskLevel]}`}>{preset.riskLevel} risk</span>
+      </div>
+      <p className="mt-1 text-xs text-neutral-500">
+        Strategy: {strategyName ?? preset.strategyKey} · Every {formatExecutionInterval(preset.executionIntervalSeconds)}
+      </p>
+      {preset.recommendedInstrumentSymbol && <p className="mt-1 text-xs text-neutral-400">Suggested market: {preset.recommendedInstrumentSymbol}</p>}
+      <p className="mt-2 text-xs leading-5 text-neutral-600">{preset.description}</p>
+      {/* No performance metric here: a preset is a configuration, not a bot anyone has run yet — showing a number would be fabricated. */}
+      <Link
+        href={`/bots/new?strategy=${preset.strategyKey}&preset=${preset.key}`}
+        className="mt-3 flex items-center justify-center rounded-full bg-brand-500 py-2 text-center text-sm font-bold text-white transition hover:bg-brand-600"
+      >
+        Use bot
+      </Link>
+    </div>
+  );
+}
+
 function BotCard({ bot, entry }: { bot: Bot; entry?: StrategyCatalogEntry }) {
   const currency = typeof bot.config.currency === 'string' ? bot.config.currency : 'USD';
   const netPnl = bot.stats ? BigInt(bot.stats.totalPnlMinorUnits) : 0n;
@@ -134,7 +179,9 @@ function BotCard({ bot, entry }: { bot: Bot; entry?: StrategyCatalogEntry }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-bold text-neutral-900">{bot.name}</p>
-          <p className="mt-0.5 text-xs text-neutral-500">{entry?.frequencyLabel} · {entry?.riskLevel} risk</p>
+          <p className="mt-0.5 text-xs text-neutral-500">
+            Every {formatExecutionInterval(bot.executionIntervalSeconds)} · {entry?.riskLevel} risk
+          </p>
         </div>
         <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${bot.status === 'active' ? 'bg-brand-50 text-brand-600' : 'bg-neutral-100 text-neutral-500'}`}>
           {bot.status === 'active' ? 'Running' : bot.status === 'inactive' ? 'Paused' : 'Not configured'}

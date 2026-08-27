@@ -13,6 +13,15 @@
  * grid trading (buy/sell across preset price bands) does not map onto
  * that without further product design, so it is shown for visual
  * completeness but cannot be created.
+ *
+ * Execution cadence is deliberately NOT one of `configFields` for any
+ * entry here: it used to be a bespoke per-strategy field (`intervalUnit`
+ * for the recurring strategy, `evaluationIntervalSeconds` for momentum),
+ * which meant two incompatible ideas of "how often" with two different
+ * validation rules. It is now the single bot-level
+ * `bots.executionIntervalSeconds` column (see `execution-interval.ts`),
+ * shown/edited as its own dedicated control everywhere a bot is
+ * configured, and honored identically by every strategy.
  */
 
 export type StrategyCategory = 'dca' | 'momentum' | 'grid';
@@ -51,12 +60,6 @@ const DIRECTION_OPTIONS: StrategyFieldOption[] = [
   { value: 'fall', label: 'Fall' },
 ];
 
-const INTERVAL_OPTIONS: StrategyFieldOption[] = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-];
-
 export const STRATEGY_CATALOG: StrategyCatalogEntry[] = [
   {
     key: 'dca_recurring',
@@ -65,13 +68,12 @@ export const STRATEGY_CATALOG: StrategyCatalogEntry[] = [
     description:
       'Places a fixed-size bet on your chosen market and direction at a fixed cadence, regardless of price — a systematic, non-predictive schedule rather than a price forecast.',
     riskLevel: 'low',
-    frequencyLabel: 'Daily, weekly, or monthly',
+    frequencyLabel: 'Configurable — every 5s up to every 60 minutes',
     configFields: [
       { key: 'instrumentId', label: 'Market', type: 'instrument', required: true },
       { key: 'selection', label: 'Direction', type: 'select', required: true, options: DIRECTION_OPTIONS },
       { key: 'stakeAmount', label: 'Stake per execution', type: 'stake', required: true },
       { key: 'currency', label: 'Currency', type: 'currency', required: true },
-      { key: 'intervalUnit', label: 'Frequency', type: 'select', required: true, options: INTERVAL_OPTIONS },
       {
         key: 'durationSeconds',
         label: 'Bet duration (seconds)',
@@ -90,7 +92,7 @@ export const STRATEGY_CATALOG: StrategyCatalogEntry[] = [
     description:
       'Computes a real RSI from recent price history for your chosen market and places a bet only when it crosses your configured oversold or overbought threshold.',
     riskLevel: 'medium',
-    frequencyLabel: 'Continuous — checked every evaluation window',
+    frequencyLabel: 'Configurable — every 5s up to every 60 minutes',
     configFields: [
       { key: 'instrumentId', label: 'Market', type: 'instrument', required: true },
       { key: 'stakeAmount', label: 'Stake per execution', type: 'stake', required: true },
@@ -130,15 +132,6 @@ export const STRATEGY_CATALOG: StrategyCatalogEntry[] = [
         min: 51,
         max: 99,
         defaultValue: 70,
-      },
-      {
-        key: 'evaluationIntervalSeconds',
-        label: 'Check interval (seconds)',
-        type: 'number',
-        required: false,
-        min: 15,
-        max: 3600,
-        defaultValue: 60,
       },
     ],
   },

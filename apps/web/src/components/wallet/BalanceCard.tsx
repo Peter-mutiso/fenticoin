@@ -25,7 +25,7 @@ export function BalanceCard({
   isDemo?: boolean;
 }) {
   return (
-    <div className="rounded-3xl bg-[#091628] p-5 text-white shadow-xl border border-white/10 sm:p-6">
+    <div className="rounded-3xl bg-navy-950 p-5 text-white shadow-xl border border-white/10 sm:p-6">
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-white/60">{isDemo ? 'Demo Balance' : 'Real Portfolio'}</span>
         {isDemo && (
@@ -35,7 +35,7 @@ export function BalanceCard({
         )}
       </div>
 
-      <p className="mt-2 text-3xl font-bold tracking-tight">
+      <p className="mt-2 text-3xl font-bold tracking-tight tabular-nums">
         {formatCurrencyMinorUnits(availableMinorUnits, currency)}
       </p>
 
@@ -47,13 +47,13 @@ export function BalanceCard({
         <div className="mt-5 grid grid-cols-2 gap-3">
           <Link
             href="/account/deposit"
-            className="flex items-center justify-center rounded-2xl bg-[#00C853] py-3 text-sm font-bold text-neutral-950 shadow-lg shadow-emerald-500/20 transition hover:bg-[#00b048]"
+            className="flex items-center justify-center rounded-2xl bg-brand-500 py-3 text-sm font-bold text-neutral-950 shadow-lg shadow-brand-500/20 transition hover:bg-brand-600"
           >
             Deposit
           </Link>
           <Link
             href="/account/withdraw"
-            className="flex items-center justify-center rounded-2xl bg-[#1e293b] py-3 text-sm font-bold text-white/90 border border-white/10 transition hover:bg-[#273548]"
+            className="flex items-center justify-center rounded-2xl bg-navy-800 py-3 text-sm font-bold text-white/90 border border-white/10 transition hover:bg-navy-900"
           >
             Withdraw
           </Link>

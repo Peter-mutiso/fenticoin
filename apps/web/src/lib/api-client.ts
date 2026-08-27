@@ -437,6 +437,23 @@ export function resetDemoAccount(): Promise<void> {
   return authedFetch<void>('/demo/reset', { method: 'POST' });
 }
 
+export interface AccountSummary {
+  userId: string;
+  balance: WalletBalance;
+}
+
+export interface DemoStatus {
+  current: 'real' | 'demo';
+  real: AccountSummary;
+  /** `null` only when the caller's demo shadow has never been provisioned yet — never fabricated. */
+  demo: AccountSummary | null;
+}
+
+/** Both accounts' real balances in one call, without switching the active session — powers the header account switcher. */
+export function getDemoStatus(currency = 'USD'): Promise<DemoStatus> {
+  return authedFetch(`/demo/status?currency=${encodeURIComponent(currency)}`);
+}
+
 // ---- wallet ------------------------------------------------------------
 
 export interface WalletBalance {
@@ -566,8 +583,8 @@ export async function listInstruments(
     ? `?category=${encodeURIComponent(params.category)}`
     : '';
 
-  const res = await publicFetch<any>(`/markets/instruments${suffix}`);
-  
+  const res = await publicFetch<Instrument[] | { items?: Instrument[] }>(`/markets/instruments${suffix}`);
+
   // Safeguard against APIs that return either wrapped objects or flat arrays
   if (Array.isArray(res)) {
     return { items: res };
@@ -766,6 +783,34 @@ export interface StrategyCatalogEntry {
   comingSoon?: boolean;
 }
 
+/**
+ * The canonical, backend-validated set of bot execution intervals — must
+ * stay in sync with `apps/api/src/bots/execution-interval.ts`. Grouped
+ * for display into Seconds / Minutes, per the product requirement that
+ * both units be first-class, professionally supported options.
+ */
+export const ALLOWED_EXECUTION_INTERVAL_SECONDS = [5, 10, 15, 30, 45, 60, 120, 300, 600, 900, 1800, 3600] as const;
+export const DEFAULT_EXECUTION_INTERVAL_SECONDS = 300;
+
+export interface ExecutionIntervalOption {
+  seconds: number;
+  label: string;
+  group: 'Seconds' | 'Minutes';
+}
+
+export const EXECUTION_INTERVAL_OPTIONS: ExecutionIntervalOption[] = ALLOWED_EXECUTION_INTERVAL_SECONDS.map((seconds) =>
+  seconds < 60
+    ? { seconds, label: `${seconds} seconds`, group: 'Seconds' }
+    : { seconds, label: `${seconds / 60} minute${seconds === 60 ? '' : 's'}`, group: 'Minutes' },
+);
+
+/** "5 seconds" / "1 minute" / "30 minutes" — for bot cards/detail pages. */
+export function formatExecutionInterval(seconds: number): string {
+  if (seconds < 60) return `${seconds} second${seconds === 1 ? '' : 's'}`;
+  const minutes = seconds / 60;
+  return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+}
+
 export interface BotStats {
   totalExecutions: number;
   totalTrades: number;
@@ -779,6 +824,7 @@ export interface Bot {
   status: BotStatus;
   strategyKey: string | null;
   config: Record<string, unknown>;
+  executionIntervalSeconds: number;
   createdAt: string;
   updatedAt: string;
   stats?: BotStats;
@@ -800,7 +846,19 @@ export interface BotLog {
   signal: Record<string, unknown> | null;
 }
 
-export function getBotCatalog(): Promise<{ items: StrategyCatalogEntry[] }> {
+/** A "Recommended Bots" marketplace entry — a named, pre-filled configuration of a real strategy above. See `apps/api/src/bots/bot-presets.ts`. */
+export interface BotPreset {
+  key: string;
+  name: string;
+  strategyKey: string;
+  riskLevel: StrategyRiskLevel;
+  executionIntervalSeconds: number;
+  recommendedInstrumentSymbol?: string;
+  description: string;
+  defaultConfig: Record<string, unknown>;
+}
+
+export function getBotCatalog(): Promise<{ items: StrategyCatalogEntry[]; presets: BotPreset[]; allowedExecutionIntervalSeconds: number[] }> {
   return authedFetch('/bots/catalog');
 }
 
@@ -812,11 +870,19 @@ export function getBot(botId: string): Promise<Bot> {
   return authedFetch(`/bots/${botId}`);
 }
 
-export function createBot(input: { name: string; strategyKey: string; config: Record<string, unknown> }): Promise<Bot> {
+export function createBot(input: {
+  name: string;
+  strategyKey: string;
+  config: Record<string, unknown>;
+  executionIntervalSeconds: number;
+}): Promise<Bot> {
   return authedFetch('/bots', { method: 'POST', body: JSON.stringify(input) });
 }
 
-export function updateBot(botId: string, patch: { name?: string; config?: Record<string, unknown> }): Promise<Bot> {
+export function updateBot(
+  botId: string,
+  patch: { name?: string; config?: Record<string, unknown>; executionIntervalSeconds?: number },
+): Promise<Bot> {
   return authedFetch(`/bots/${botId}`, { method: 'PATCH', body: JSON.stringify(patch) });
 }
 

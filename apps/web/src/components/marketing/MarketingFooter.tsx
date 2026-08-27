@@ -35,7 +35,7 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
 /** Marketing-site-only footer — never rendered inside the authenticated app shell. */
 export function MarketingFooter() {
   return (
-    <footer className="border-t border-white/10 bg-[#07111f] text-white/60">
+    <footer className="border-t border-white/10 bg-navy-950 text-white/60">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 gap-10 sm:grid-cols-4">
           {COLUMNS.map((column) => (

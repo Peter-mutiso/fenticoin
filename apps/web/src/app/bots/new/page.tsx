@@ -7,7 +7,7 @@ export default function NewBotPage() {
   return (
     <AppShell requireAuth>
       <div className="mx-auto max-w-lg pb-8">
-        <h1 className="text-2xl font-bold tracking-tight">New trading bot</h1>
+        <h1 className="text-3xl font-bold tracking-tight">New trading bot</h1>
         <div className="mt-5">
           <Suspense>
             <NewBotForm />

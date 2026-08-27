@@ -18,7 +18,7 @@ export function FeaturedInstruments() {
         <h2 id="featured-heading" className="text-lg font-bold text-neutral-900">
           Watchlist
         </h2>
-        <Link href="/markets" className="text-sm font-semibold text-emerald-600 hover:underline">
+        <Link href="/markets" className="text-sm font-semibold text-brand-600 hover:underline">
           See All &gt;
         </Link>
       </div>
@@ -35,7 +35,7 @@ export function FeaturedInstruments() {
                 <p className="text-sm font-bold text-neutral-900">{instrument.displaySymbol.split('/')[0]}</p>
                 <p className="mt-0.5 truncate text-xs text-neutral-500">{instrument.name}</p>
                 <div className="mt-2">
-                  <InstrumentPrice instrumentId={instrument.id} currency={instrument.quoteCurrency} />
+                  <InstrumentPrice instrumentId={instrument.id} currency={instrument.quoteCurrency} compact />
                 </div>
               </Link>
             ))}

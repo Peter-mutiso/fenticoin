@@ -9,6 +9,7 @@ export function serializeBot(bot: Bot, stats?: BotStats) {
     status: bot.status,
     strategyKey: bot.strategyKey,
     config: bot.config,
+    executionIntervalSeconds: bot.executionIntervalSeconds,
     createdAt: bot.createdAt,
     updatedAt: bot.updatedAt,
     stats: stats

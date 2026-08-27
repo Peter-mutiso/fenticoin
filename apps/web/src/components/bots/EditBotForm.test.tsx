@@ -46,6 +46,7 @@ const BOT = {
   status: 'inactive' as const,
   strategyKey: 'dca_recurring',
   config: { instrumentId: 'inst-1', stakeAmount: '1000', currency: 'USD' },
+  executionIntervalSeconds: 300,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -76,8 +77,26 @@ describe('EditBotForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() =>
-      expect(mockUpdateBot).toHaveBeenCalledWith('bot-1', { name: 'BTC weekly v2', config: { instrumentId: 'inst-1', stakeAmount: '1000', currency: 'USD' } }),
+      expect(mockUpdateBot).toHaveBeenCalledWith('bot-1', {
+        name: 'BTC weekly v2',
+        config: { instrumentId: 'inst-1', stakeAmount: '1000', currency: 'USD' },
+        executionIntervalSeconds: 300,
+      }),
     );
     expect(mockPush).toHaveBeenCalledWith('/bots/bot-1');
+  });
+
+  it('prefills the execution interval from the bot and lets it be changed', async () => {
+    mockGetBot.mockResolvedValue({ ...BOT, executionIntervalSeconds: 1800 });
+    mockUpdateBot.mockResolvedValue({ ...BOT, executionIntervalSeconds: 60 });
+    renderWithProviders(<EditBotForm botId="bot-1" />);
+
+    await screen.findByDisplayValue('BTC weekly');
+    expect(screen.getByLabelText('Execution interval')).toHaveValue('1800');
+
+    await userEvent.selectOptions(screen.getByLabelText('Execution interval'), '60');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(mockUpdateBot).toHaveBeenCalledWith('bot-1', expect.objectContaining({ executionIntervalSeconds: 60 })));
   });
 });

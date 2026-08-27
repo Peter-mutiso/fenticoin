@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, ArrowRight, Check, Eye, EyeOff, LoaderCircle, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Check, Eye, EyeOff, LoaderCircle, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Logo } from '@/components/layout/Logo';
 import { ApiError, NetworkError } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { Notice } from '@/components/ui/Notice';
 
 function describeError(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -52,9 +53,9 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f9fc]">
+    <main className="min-h-screen bg-white">
       <div className="mx-auto grid min-h-screen max-w-6xl lg:grid-cols-[1.05fr_.95fr]">
-        <section className="hidden flex-col justify-between bg-[#07111f] p-10 text-white lg:flex xl:p-14">
+        <section className="hidden flex-col justify-between bg-navy-950 p-10 text-white lg:flex xl:p-14">
           <Logo inverse />
           <div className="max-w-xl">
             <p className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-brand-400">Start trading with FentiCoin</p>
@@ -92,18 +93,18 @@ export default function SignupPage() {
                 <div>
                   <label htmlFor="signup-email" className="text-sm font-semibold text-neutral-800">Email address</label>
                   <input id="signup-email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3.5 outline-none transition focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10" placeholder="you@example.com" />
+                    className="mt-2 w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 outline-none transition focus:ring-2 focus:ring-brand-500" placeholder="you@example.com" />
                 </div>
                 <div>
                   <label htmlFor="signup-dob" className="text-sm font-semibold text-neutral-800">Date of birth <span className="font-normal text-neutral-400">(optional)</span></label>
                   <input id="signup-dob" type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3.5 outline-none transition focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10" />
+                    className="mt-2 w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 outline-none transition focus:ring-2 focus:ring-brand-500" />
                 </div>
                 <div>
                   <label htmlFor="signup-password" className="text-sm font-semibold text-neutral-800">Password</label>
                   <div className="relative mt-2">
                     <input id="signup-password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)}
-                      className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3.5 pr-12 outline-none transition focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10" placeholder="At least 12 characters" />
+                      className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 pr-12 outline-none transition focus:ring-2 focus:ring-brand-500" placeholder="At least 12 characters" />
                     <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-neutral-400" aria-label="Toggle password visibility">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
                   </div>
                 </div>
@@ -111,19 +112,19 @@ export default function SignupPage() {
                   <label htmlFor="signup-confirm" className="text-sm font-semibold text-neutral-800">Confirm password</label>
                   <div className="relative mt-2">
                     <input id="signup-confirm" type={showConfirm ? 'text' : 'password'} autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)}
-                      className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3.5 pr-12 outline-none transition focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10" placeholder="Repeat your password" />
+                      className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 pr-12 outline-none transition focus:ring-2 focus:ring-brand-500" placeholder="Repeat your password" />
                     <button type="button" onClick={() => setShowConfirm((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-neutral-400" aria-label="Toggle confirmation visibility">{showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
                   </div>
                 </div>
 
                 <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-neutral-50 p-3 text-xs leading-5 text-neutral-500">
-                  <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-1 h-4 w-4 accent-[var(--brand)]" />
+                  <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-1 h-4 w-4 accent-brand-500" />
                   <span>I confirm that I am eligible to use the service and agree to the platform terms and responsible-use requirements.</span>
                 </label>
 
-                {error && <div role="alert" className="flex gap-2 rounded-2xl bg-red-50 p-3 text-sm text-red-700"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</div>}
+                {error && <Notice text={error} />}
 
-                <button type="submit" disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#07111f] px-4 py-3.5 font-bold text-white shadow-lg transition hover:bg-[#0c1b2d] disabled:cursor-not-allowed disabled:opacity-60">
+                <button type="submit" disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-3.5 font-bold text-white shadow-lg transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60">
                   {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <>Create account <ArrowRight className="h-4 w-4" /></>}
                 </button>
               </form>

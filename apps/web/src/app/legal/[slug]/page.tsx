@@ -22,7 +22,7 @@ export default async function LegalPage({ params }: { params: Promise<{ slug: st
   if (!title) notFound();
 
   return (
-    <main className="min-h-screen bg-[#f7f9fc]">
+    <main className="min-h-screen bg-white">
       <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6">
         <Link href="/" className="inline-block"><Logo /></Link>
         <div className="mt-10 rounded-3xl border border-neutral-200 bg-white p-8 text-center shadow-sm">

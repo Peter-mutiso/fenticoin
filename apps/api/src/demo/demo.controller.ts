@@ -1,4 +1,4 @@
-import { Controller, ForbiddenException, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
+import { Controller, ForbiddenException, Get, HttpCode, HttpStatus, Post, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 
 import type { AuthResult } from '../auth/auth.service';
@@ -18,6 +18,12 @@ export class DemoController {
   @Post('enter')
   enterDemo(@CurrentUser() user: RequestUser, @Req() req: Request): Promise<AuthResult> {
     return this.demoService.enterDemo(user.id, metaFromRequest(req));
+  }
+
+  /** Both accounts' balances, without switching sessions — see `DemoService.getStatus`. Powers the header account switcher. */
+  @Get('status')
+  getStatus(@CurrentUser() user: RequestUser, @Query('currency') currency = 'USD') {
+    return this.demoService.getStatus(user, currency);
   }
 
   /**

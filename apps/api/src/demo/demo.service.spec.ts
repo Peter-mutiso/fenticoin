@@ -1,6 +1,8 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { Money, KNOWN_CURRENCIES } from '@fenticoin/domain';
 
 import type { AuditLogService } from '../audit/audit-log.service';
+import type { RequestUser } from '../authorization/types/request-user';
 import type { AppConfigService } from '../config/app-config.service';
 import type { DrizzleDb } from '../database/database.types';
 import type { User } from '../database/schema';
@@ -39,14 +41,16 @@ interface Harness {
   service: DemoService;
   db: { select: jest.Mock; transaction: jest.Mock };
   usersService: { findById: jest.Mock };
-  walletService: { getOrCreateWalletAccounts: jest.Mock };
+  walletService: { getOrCreateWalletAccounts: jest.Mock; getBalance: jest.Mock };
   transactionService: { adjustBalance: jest.Mock; refundBet: jest.Mock };
   sessionService: { createSession: jest.Mock };
   tokenService: { signAccessToken: jest.Mock };
   auditLog: { record: jest.Mock };
 }
 
-function makeHarness(options: { existingDemoShadow?: User; currentAvailableBalance?: bigint } = {}): Harness {
+function makeHarness(
+  options: { existingDemoShadow?: User; currentAvailableBalance?: bigint; balancesByUserId?: Record<string, bigint> } = {},
+): Harness {
   const tx = {
     select: jest.fn(),
     insert: jest.fn(),
@@ -67,6 +71,11 @@ function makeHarness(options: { existingDemoShadow?: User; currentAvailableBalan
       available: { id: 'ledger-available', balance: options.currentAvailableBalance ?? 0n },
       locked: { id: 'ledger-locked', balance: 0n },
     }),
+    getBalance: jest.fn(async (userId: string, currency: string) => ({
+      currency,
+      available: Money.fromMinorUnits(options.balancesByUserId?.[userId] ?? 0n, KNOWN_CURRENCIES[currency]!),
+      locked: Money.fromMinorUnits(0n, KNOWN_CURRENCIES[currency]!),
+    })),
   };
   const transactionService = { adjustBalance: jest.fn().mockResolvedValue({}), refundBet: jest.fn().mockResolvedValue({}) };
   const sessionService = { createSession: jest.fn().mockResolvedValue({ session: { id: 'session-1' }, refreshTokenRaw: 'refresh-1' }) };
@@ -191,6 +200,55 @@ describe('DemoService', () => {
 
       await h.service.resetDemo('demo-user-1');
 
+      expect(h.transactionService.adjustBalance).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getStatus', () => {
+    function requestUser(overrides: Partial<RequestUser> = {}): RequestUser {
+      return {
+        id: 'real-user-1',
+        email: 'trader@example.com',
+        status: 'active',
+        sessionId: 'session-1',
+        roles: [],
+        permissions: [],
+        accountType: 'real',
+        demoOfUserId: null,
+        ...overrides,
+      };
+    }
+
+    it("reads both accounts' real balances without switching sessions or provisioning a demo shadow", async () => {
+      const h = makeHarness({
+        existingDemoShadow: demoUser(),
+        balancesByUserId: { 'real-user-1': 997_500n, 'demo-user-1': 1_000_000n },
+      });
+
+      const status = await h.service.getStatus(requestUser());
+
+      expect(status.current).toBe('real');
+      expect(status.real).toEqual({ userId: 'real-user-1', balance: expect.objectContaining({ availableMinorUnits: '997500' }) });
+      expect(status.demo).toEqual({ userId: 'demo-user-1', balance: expect.objectContaining({ availableMinorUnits: '1000000' }) });
+      expect(h.walletService.getOrCreateWalletAccounts).not.toHaveBeenCalled();
+    });
+
+    it('resolves the linked real user when called from a demo session', async () => {
+      const h = makeHarness({ existingDemoShadow: demoUser(), balancesByUserId: { 'real-user-1': 500_000n, 'demo-user-1': 800_000n } });
+
+      const status = await h.service.getStatus(requestUser({ id: 'demo-user-1', accountType: 'demo', demoOfUserId: 'real-user-1' }));
+
+      expect(status.current).toBe('demo');
+      expect(status.real.userId).toBe('real-user-1');
+      expect(status.real.balance.availableMinorUnits).toBe('500000');
+    });
+
+    it('reports demo as null (never fabricated or auto-provisioned) when no shadow has been created yet', async () => {
+      const h = makeHarness({ existingDemoShadow: undefined, balancesByUserId: { 'real-user-1': 250_000n } });
+
+      const status = await h.service.getStatus(requestUser());
+
+      expect(status.demo).toBeNull();
       expect(h.transactionService.adjustBalance).not.toHaveBeenCalled();
     });
   });

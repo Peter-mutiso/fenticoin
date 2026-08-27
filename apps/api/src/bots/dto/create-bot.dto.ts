@@ -1,4 +1,6 @@
-import { IsObject, IsString, Length } from 'class-validator';
+import { IsIn, IsObject, IsString, Length } from 'class-validator';
+
+import { ALLOWED_EXECUTION_INTERVAL_SECONDS } from '../execution-interval';
 
 export class CreateBotDto {
   @IsString()
@@ -10,4 +12,8 @@ export class CreateBotDto {
 
   @IsObject()
   config!: Record<string, unknown>;
+
+  /** Must be one of `ALLOWED_EXECUTION_INTERVAL_SECONDS` — see `execution-interval.ts`. */
+  @IsIn(ALLOWED_EXECUTION_INTERVAL_SECONDS)
+  executionIntervalSeconds!: number;
 }

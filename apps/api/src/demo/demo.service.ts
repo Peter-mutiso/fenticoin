@@ -6,6 +6,7 @@ import { AuditLogService } from '../audit/audit-log.service';
 import { toPublicUser, type AuthResult } from '../auth/auth.service';
 import { SessionService, type SessionMeta } from '../auth/services/session.service';
 import { TokenService } from '../auth/services/token.service';
+import type { RequestUser } from '../authorization/types/request-user';
 import { AppConfigService } from '../config/app-config.service';
 import { DRIZZLE_CLIENT } from '../database/database.constants';
 import type { DrizzleDb } from '../database/database.types';
@@ -20,6 +21,7 @@ import {
 } from '../database/schema';
 import { buildDemoResetEvent } from '../realtime/realtime-events';
 import { UsersService } from '../users/users.service';
+import { serializeBalance } from '../wallet/mappers';
 import { TransactionService } from '../wallet/transaction.service';
 import { WalletService } from '../wallet/wallet.service';
 
@@ -67,6 +69,39 @@ export class DemoService {
     });
 
     return { accessToken, refreshToken: refreshTokenRaw, user: toPublicUser(demoUser) };
+  }
+
+  /**
+   * Both accounts' balances in one call, without switching the active
+   * session — this is what powers the header account switcher, which
+   * shows "REAL $X / DEMO $Y" side by side so switching is a genuine
+   * choice, not a leap of faith. Works from either session: a demo
+   * session resolves its own linked real user via `demoOfUserId`, a real
+   * session looks up its own shadow (without creating one — a status
+   * check must never have the side effect of provisioning a wallet).
+   * Balances are read fresh from `WalletService` on every call; nothing
+   * here is cached or client-supplied.
+   */
+  async getStatus(
+    user: RequestUser,
+    currency = 'USD',
+  ): Promise<{
+    current: 'real' | 'demo';
+    real: { userId: string; balance: ReturnType<typeof serializeBalance> };
+    demo: { userId: string; balance: ReturnType<typeof serializeBalance> } | null;
+  }> {
+    const realUserId = user.accountType === 'demo' ? user.demoOfUserId! : user.id;
+
+    const realBalance = await this.walletService.getBalance(realUserId, currency);
+
+    const [demoUser] = await this.db.select({ id: users.id }).from(users).where(eq(users.demoOfUserId, realUserId)).limit(1);
+    const demo = demoUser ? { userId: demoUser.id, balance: serializeBalance(await this.walletService.getBalance(demoUser.id, currency)) } : null;
+
+    return {
+      current: user.accountType,
+      real: { userId: realUserId, balance: serializeBalance(realBalance) },
+      demo,
+    };
   }
 
   /**

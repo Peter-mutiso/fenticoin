@@ -7,6 +7,7 @@ import { Suspense, useState } from 'react';
 
 import { Logo } from '@/components/layout/Logo';
 import { ApiError, NetworkError, resetPassword } from '@/lib/api-client';
+import { Notice } from '@/components/ui/Notice';
 
 function describeError(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -27,7 +28,7 @@ function ResetPasswordForm() {
   if (!token) {
     return (
       <div className="text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-loss-50 text-loss-500">
           <AlertCircle className="h-6 w-6" />
         </div>
         <h1 className="mt-5 text-2xl font-bold">This link is invalid or has expired</h1>
@@ -97,7 +98,7 @@ function ResetPasswordForm() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3.5 pr-12 outline-none focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
+              className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 pr-12 outline-none focus:ring-2 focus:ring-brand-500"
               placeholder="At least 12 characters"
             />
             <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-neutral-400" aria-label="Toggle password visibility">
@@ -114,20 +115,15 @@ function ResetPasswordForm() {
             required
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
-            className="mt-2 w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3.5 outline-none focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10"
+            className="mt-2 w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 outline-none focus:ring-2 focus:ring-brand-500"
             placeholder="Repeat your new password"
           />
         </div>
-        {error && (
-          <div role="alert" className="flex gap-2 rounded-2xl bg-red-50 p-3 text-sm text-red-700">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            {error}
-          </div>
-        )}
+        {error && <Notice text={error} />}
         <button
           type="submit"
           disabled={submitting}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#07111f] px-4 py-3.5 font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-3.5 font-bold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
           Reset password
@@ -139,7 +135,7 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f7f9fc] px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-white px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-8 flex justify-center">
           <Logo />

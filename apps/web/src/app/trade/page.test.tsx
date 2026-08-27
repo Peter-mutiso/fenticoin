@@ -6,6 +6,7 @@ import TradePage from './page';
 
 const mockGetMe = jest.fn();
 const mockListBets = jest.fn().mockResolvedValue({ items: [] });
+const mockGetPrice = jest.fn().mockResolvedValue({ instrumentId: 'inst-1', price: '100000.00', priceMinorUnits: '10000000', currency: 'USD', source: 'test', observedAt: new Date().toISOString(), receivedAt: new Date().toISOString(), isStale: false });
 jest.mock('@/lib/api-client', () => {
   const actual = jest.requireActual('@/lib/api-client');
   return {
@@ -13,6 +14,7 @@ jest.mock('@/lib/api-client', () => {
     listInstruments: jest.fn().mockResolvedValue({ items: [] }),
     getMe: (...args: unknown[]) => mockGetMe(...args),
     listBets: (...args: unknown[]) => mockListBets(...args),
+    getPrice: (...args: unknown[]) => mockGetPrice(...args),
   };
 });
 
@@ -60,7 +62,7 @@ describe('TradePage', () => {
     expect(screen.getByRole('button', { name: /review bet/i })).toBeDisabled();
   });
 
-  it('surfaces the bet history/open-positions panel once the user has placed bets, on this same page', async () => {
+  it('surfaces the open-positions panel once the user has placed bets, on this same page', async () => {
     mockListBets.mockResolvedValue({
       items: [
         {
@@ -93,6 +95,6 @@ describe('TradePage', () => {
     authenticate();
     renderWithProviders(<TradePage />);
 
-    await waitFor(() => expect(screen.getByRole('heading', { name: /your bets/i })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: /open positions/i })).toBeInTheDocument());
   });
 });

@@ -90,4 +90,25 @@ describe('BotService', () => {
     const h = harness({ existingBot: { ...BOT_ROW, status: 'active' } });
     await expect(h.service.update('user-1', 'bot-1', { config: validConfig })).rejects.toThrow(ConflictException);
   });
+
+  it('persists a caller-supplied executionIntervalSeconds on create', async () => {
+    const h = harness();
+    await h.service.create('user-1', { name: 'BTC weekly', strategyKey: 'dca_recurring', config: validConfig, executionIntervalSeconds: 30 });
+    const [values] = h.db.insert.mock.results[0]!.value.values.mock.calls[0] as [Record<string, unknown>];
+    expect(values.executionIntervalSeconds).toBe(30);
+  });
+
+  it('defaults executionIntervalSeconds to 300 seconds when the caller omits it', async () => {
+    const h = harness();
+    await h.service.create('user-1', { name: 'BTC weekly', strategyKey: 'dca_recurring', config: validConfig });
+    const [values] = h.db.insert.mock.results[0]!.value.values.mock.calls[0] as [Record<string, unknown>];
+    expect(values.executionIntervalSeconds).toBe(300);
+  });
+
+  it('allows updating executionIntervalSeconds while the bot is inactive', async () => {
+    const h = harness();
+    await h.service.update('user-1', 'bot-1', { executionIntervalSeconds: 3600 });
+    const [updates] = h.db.update.mock.results[0]!.value.set.mock.calls[0] as [Record<string, unknown>];
+    expect(updates.executionIntervalSeconds).toBe(3600);
+  });
 });

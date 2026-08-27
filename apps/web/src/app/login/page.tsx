@@ -18,9 +18,9 @@ export default function LoginPage() {
   }, [status, router]);
 
   return (
-    <main className="min-h-screen bg-[#f7f9fc]">
+    <main className="min-h-screen bg-white">
       <div className="mx-auto grid min-h-screen max-w-6xl lg:grid-cols-[.9fr_1.1fr]">
-        <section className="hidden flex-col justify-between bg-[#07111f] p-10 text-white lg:flex xl:p-14">
+        <section className="hidden flex-col justify-between bg-navy-950 p-10 text-white lg:flex xl:p-14">
           <Logo inverse />
           <div>
             <p className="text-sm font-bold uppercase tracking-[.18em] text-brand-400">Welcome back</p>

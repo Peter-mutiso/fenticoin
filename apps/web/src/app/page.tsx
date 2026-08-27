@@ -51,7 +51,7 @@ export default function LandingPage() {
       <PublicHeader />
 
       {/* Hero */}
-      <section className="bg-[#07111f] text-white">
+      <section className="bg-navy-950 text-white">
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:items-center lg:py-24 lg:px-8">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-400">
@@ -157,7 +157,7 @@ export default function LandingPage() {
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
           {STEPS.map((item) => (
             <div key={item.step} className="rounded-3xl border border-neutral-200 bg-white p-6">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#07111f] text-sm font-bold text-white">{item.step}</span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-950 text-sm font-bold text-white">{item.step}</span>
               <h3 className="mt-4 text-sm font-bold text-neutral-950">{item.title}</h3>
               <p className="mt-2 text-sm leading-6 text-neutral-500">{item.description}</p>
             </div>
@@ -166,7 +166,7 @@ export default function LandingPage() {
       </section>
 
       {/* Security */}
-      <section id="security" className="bg-[#07111f] py-16 text-white">
+      <section id="security" className="bg-navy-950 py-16 text-white">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-brand-400">
@@ -205,7 +205,7 @@ export default function LandingPage() {
 
       {/* Final CTA */}
       <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center justify-between gap-6 rounded-3xl bg-[#07111f] p-10 text-center text-white sm:flex-row sm:text-left">
+        <div className="flex flex-col items-center justify-between gap-6 rounded-3xl bg-navy-950 p-10 text-center text-white sm:flex-row sm:text-left">
           <div>
             <h2 className="text-2xl font-bold">Ready to get started?</h2>
             <p className="mt-2 text-white/55">Create your account in under a minute.</p>

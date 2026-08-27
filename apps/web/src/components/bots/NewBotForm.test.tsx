@@ -10,9 +10,10 @@ const mockCreateBot = jest.fn();
 const mockListInstruments = jest.fn();
 const mockPush = jest.fn();
 let searchParamValue = 'dca_recurring';
+let presetParamValue = '';
 
 jest.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(`strategy=${searchParamValue}`),
+  useSearchParams: () => new URLSearchParams(`strategy=${searchParamValue}${presetParamValue ? `&preset=${presetParamValue}` : ''}`),
   useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn(), forward: jest.fn(), refresh: jest.fn(), prefetch: jest.fn() }),
 }));
 
@@ -47,7 +48,21 @@ describe('NewBotForm', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     searchParamValue = 'dca_recurring';
-    mockGetBotCatalog.mockResolvedValue({ items: [ENTRY, { ...ENTRY, key: 'grid_trading', category: 'grid', comingSoon: true }] });
+    presetParamValue = '';
+    mockGetBotCatalog.mockResolvedValue({
+      items: [ENTRY, { ...ENTRY, key: 'grid_trading', category: 'grid', comingSoon: true }],
+      presets: [
+        {
+          key: 'dca_momentum',
+          name: 'DCA Momentum',
+          strategyKey: 'dca_recurring',
+          riskLevel: 'low',
+          executionIntervalSeconds: 3600,
+          description: 'Hourly, systematic.',
+          defaultConfig: { selection: 'rise', durationSeconds: 300 },
+        },
+      ],
+    });
     mockListInstruments.mockResolvedValue({ items: [{ id: 'inst-1', symbol: 'BTC', quoteCurrency: 'USD', displaySymbol: 'BTC/USD', name: 'Bitcoin', categoryKey: 'crypto', pricePrecision: 2, status: 'active', maxPriceAgeSeconds: 30 }] });
   });
 
@@ -79,6 +94,7 @@ describe('NewBotForm', () => {
           name: 'BTC weekly',
           strategyKey: 'dca_recurring',
           config: { instrumentId: 'inst-1', selection: 'rise', stakeAmount: '1000', currency: 'USD', intervalUnit: 'weekly', durationSeconds: 60 },
+          executionIntervalSeconds: 300,
         },
         expect.anything(),
       ),
@@ -102,6 +118,50 @@ describe('NewBotForm', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/not currently tradable/i);
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('lets the user pick a non-default execution interval and sends it to the server', async () => {
+    mockCreateBot.mockResolvedValue({ id: 'bot-new' });
+    renderWithProviders(<NewBotForm />);
+    await screen.findByText('Bot name');
+
+    await userEvent.type(screen.getByLabelText('Bot name'), 'BTC weekly');
+    await userEvent.selectOptions(screen.getByLabelText('Market'), 'inst-1');
+    await userEvent.selectOptions(screen.getByLabelText('Direction'), 'rise');
+    await userEvent.type(screen.getByLabelText('Stake per execution'), '10');
+    await userEvent.selectOptions(screen.getByLabelText('Frequency'), 'weekly');
+    await userEvent.clear(screen.getByLabelText('Bet duration (seconds)'));
+    await userEvent.type(screen.getByLabelText('Bet duration (seconds)'), '60');
+    await userEvent.selectOptions(screen.getByLabelText('Execution interval'), '15');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Create bot' }));
+
+    await waitFor(() =>
+      expect(mockCreateBot).toHaveBeenCalledWith(expect.objectContaining({ executionIntervalSeconds: 15 }), expect.anything()),
+    );
+  });
+
+  it("pre-fills name, config, and interval from a Recommended Bots preset, but still lets the user edit and submit through the same real path", async () => {
+    presetParamValue = 'dca_momentum';
+    mockCreateBot.mockResolvedValue({ id: 'bot-new' });
+    renderWithProviders(<NewBotForm />);
+
+    expect(await screen.findByDisplayValue('DCA Momentum')).toBeInTheDocument();
+    expect(screen.getByLabelText('Direction')).toHaveValue('rise');
+    expect(screen.getByLabelText('Execution interval')).toHaveValue('3600');
+
+    await screen.findByRole('option', { name: /btc\/usd/i });
+    await userEvent.selectOptions(screen.getByLabelText('Market'), 'inst-1');
+    await userEvent.type(screen.getByLabelText('Stake per execution'), '25');
+    await userEvent.selectOptions(screen.getByLabelText('Frequency'), 'weekly');
+    await userEvent.click(screen.getByRole('button', { name: 'Create bot' }));
+
+    await waitFor(() =>
+      expect(mockCreateBot).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'DCA Momentum', strategyKey: 'dca_recurring', executionIntervalSeconds: 3600 }),
+        expect.anything(),
+      ),
+    );
   });
 
   it("refuses to configure the coming-soon Grid strategy", async () => {

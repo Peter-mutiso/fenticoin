@@ -30,15 +30,13 @@ export function InstrumentCard({ instrument }: { instrument: Instrument }) {
           <p className="truncate text-sm font-bold text-neutral-900">
             {instrument.displaySymbol.replace('/', ' / ')}
           </p>
-          <p className="truncate text-xs text-neutral-400">Market data available</p>
+          <p className="truncate text-xs text-neutral-400">{instrument.name}</p>
         </div>
       </div>
 
-      {/* Right side: Last price and 24h Change Pill Badge */}
+      {/* Right side: last known price */}
       <div className="text-right shrink-0">
-        <div className="text-sm font-bold text-neutral-900">
-          <InstrumentPrice instrumentId={instrument.id} currency={instrument.quoteCurrency} />
-        </div>
+        <InstrumentPrice instrumentId={instrument.id} currency={instrument.quoteCurrency} compact />
       </div>
     </Link>
   );

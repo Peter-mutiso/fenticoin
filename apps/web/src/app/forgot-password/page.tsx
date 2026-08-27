@@ -1,11 +1,12 @@
 'use client';
 
-import { AlertCircle, ArrowLeft, CheckCircle2, LoaderCircle, Mail } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, LoaderCircle, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
 import { Logo } from '@/components/layout/Logo';
 import { ApiError, NetworkError, forgotPassword } from '@/lib/api-client';
+import { Notice } from '@/components/ui/Notice';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -22,7 +23,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f7f9fc] px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-white px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-8 flex justify-center"><Logo /></div>
         <div className="rounded-3xl border border-neutral-200 bg-white p-7 shadow-[0_24px_70px_rgba(15,23,42,.08)] sm:p-9">
@@ -37,9 +38,9 @@ export default function ForgotPasswordPage() {
             <>
               <div className="mb-7"><div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-600"><Mail className="h-5 w-5" /></div><h1 className="text-2xl font-bold">Reset your password</h1><p className="mt-2 text-sm leading-6 text-neutral-500">Enter your email and we&rsquo;ll send password reset instructions if an account exists.</p></div>
               <form onSubmit={submit} className="space-y-5">
-                <div><label htmlFor="email" className="text-sm font-semibold">Email address</label><input id="email" type="email" required value={email} onChange={e => setEmail(e.target.value)} className="mt-2 w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3.5 outline-none focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/10" placeholder="you@example.com" /></div>
-                {error && <div role="alert" className="flex gap-2 rounded-2xl bg-red-50 p-3 text-sm text-red-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
-                <button disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#07111f] px-4 py-3.5 font-bold text-white disabled:opacity-60">{submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}Send reset instructions</button>
+                <div><label htmlFor="email" className="text-sm font-semibold">Email address</label><input id="email" type="email" required value={email} onChange={e => setEmail(e.target.value)} className="mt-2 w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 outline-none focus:ring-2 focus:ring-brand-500" placeholder="you@example.com" /></div>
+                {error && <Notice text={error} />}
+                <button disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-3.5 font-bold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60">{submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}Send reset instructions</button>
               </form>
               <p className="mt-6 text-center text-sm text-neutral-500"><Link href="/login" className="font-bold text-brand-600">Back to login</Link></p>
             </>

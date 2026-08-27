@@ -20,7 +20,7 @@ export function PublicHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-[#07111f]/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-white/10 bg-navy-950/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" aria-label="FentiCoin home">
           <Logo inverse />
@@ -63,7 +63,7 @@ export function PublicHeader() {
       </div>
 
       {open && (
-        <div className="border-t border-white/10 bg-[#07111f] px-4 pb-6 pt-2 lg:hidden">
+        <div className="border-t border-white/10 bg-navy-950 px-4 pb-6 pt-2 lg:hidden">
           <nav aria-label="Primary" className="flex flex-col gap-1">
             {NAV_LINKS.map((link) => (
               <a

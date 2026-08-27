@@ -69,11 +69,23 @@ function authenticate(accountType: 'real' | 'demo' = 'real') {
 }
 
 describe('BotsBrowser', () => {
+  const PRESETS = [
+    {
+      key: 'mean_reversion',
+      name: 'Mean Reversion',
+      strategyKey: 'momentum_rsi',
+      riskLevel: 'medium' as const,
+      executionIntervalSeconds: 60,
+      description: 'The standard RSI mean-reversion read.',
+      defaultConfig: { rsiPeriod: 14 },
+    },
+  ];
+
   beforeEach(() => {
     jest.clearAllMocks();
     window.localStorage.clear();
     authenticate();
-    mockGetBotCatalog.mockResolvedValue({ items: CATALOG });
+    mockGetBotCatalog.mockResolvedValue({ items: CATALOG, presets: PRESETS });
   });
 
   it('shows the summary hero and an honest "no bots yet" prompt for a strategy with no bots', async () => {
@@ -96,6 +108,7 @@ describe('BotsBrowser', () => {
           status: 'active',
           strategyKey: 'dca_recurring',
           config: { currency: 'USD' },
+          executionIntervalSeconds: 300,
           createdAt: '2026-01-01T00:00:00.000Z',
           updatedAt: '2026-01-01T00:00:00.000Z',
           stats: { totalExecutions: 3, totalTrades: 2, totalPnlMinorUnits: '500' },
@@ -126,6 +139,20 @@ describe('BotsBrowser', () => {
     renderWithProviders(<BotsBrowser />);
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+  });
+
+  it('shows Recommended Bots backed by a real strategy, with no fabricated performance metric', async () => {
+    mockListBots.mockResolvedValue({ items: [], summary: { totalBots: 0, activeBots: 0, weeklyReturnPercent: null } });
+    renderWithProviders(<BotsBrowser />);
+
+    expect(await screen.findByText('Mean Reversion')).toBeInTheDocument();
+    expect(screen.getByText(/strategy: momentum \(rsi\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/every 1 minute/i)).toBeInTheDocument();
+    // No win-rate/return percentage invented for a preset nobody has run.
+    expect(screen.queryByText(/win rate/i)).not.toBeInTheDocument();
+
+    const useBotLink = screen.getByRole('link', { name: /use bot/i });
+    expect(useBotLink).toHaveAttribute('href', '/bots/new?strategy=momentum_rsi&preset=mean_reversion');
   });
 
   it('never tells a demo account its bots trade with a "real balance"', async () => {

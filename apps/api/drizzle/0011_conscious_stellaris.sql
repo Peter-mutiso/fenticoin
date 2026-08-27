@@ -1,0 +1,2 @@
+ALTER TABLE "bots" ADD COLUMN "execution_interval_seconds" integer DEFAULT 300 NOT NULL;--> statement-breakpoint
+ALTER TABLE "bots" ADD CONSTRAINT "bots_execution_interval_seconds_allowed" CHECK ("bots"."execution_interval_seconds" IN (5, 10, 15, 30, 45, 60, 120, 300, 600, 900, 1800, 3600));

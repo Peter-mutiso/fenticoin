@@ -8,8 +8,10 @@ import { useState } from 'react';
 import {
   activateBot,
   deactivateBot,
+  formatExecutionInterval,
   getBot,
   getBotCatalog,
+  isSettledBetStatus,
   listBets,
   listBotLogs,
   listInstruments,
@@ -19,12 +21,13 @@ import { describeApiError } from '@/lib/api-errors';
 import { formatCurrencyMinorUnits } from '@/lib/money';
 import { BetDetailModal } from '@/components/betting/BetDetailModal';
 import { BetRow } from '@/components/betting/BetRow';
+import { OpenPositions } from '@/components/betting/OpenPositions';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Notice } from '@/components/ui/Notice';
 import { StatusBadge, type StatusStyle } from '@/components/ui/StatusBadge';
 import { useToast } from '@/components/ui/Toast';
 
-const BOT_STATUS_STYLES: Record<BotStatus, StatusStyle> = {
+export const BOT_STATUS_STYLES: Record<BotStatus, StatusStyle> = {
   active: { label: 'Running', className: 'bg-brand-50 text-brand-600', icon: CheckCircle2 },
   inactive: { label: 'Paused', className: 'bg-neutral-100 text-neutral-700', icon: Pause },
   strategy_unconfigured: { label: 'Not configured', className: 'bg-amber-50 text-amber-700', icon: AlertCircle },
@@ -96,7 +99,7 @@ export function BotDetail({ botId }: { botId: string }) {
       </div>
 
       <div className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
-        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <Stat
             label="Total P/L"
             value={bot.stats && bot.stats.totalTrades > 0 ? `${netPnl >= 0n ? '+' : '-'}${formatCurrencyMinorUnits((netPnl < 0n ? -netPnl : netPnl).toString(), configCurrency)}` : '—'}
@@ -104,6 +107,7 @@ export function BotDetail({ botId }: { botId: string }) {
           />
           <Stat label="Executions" value={String(bot.stats?.totalExecutions ?? 0)} />
           <Stat label="Trades" value={String(bot.stats?.totalTrades ?? 0)} />
+          <Stat label="Interval" value={`Every ${formatExecutionInterval(bot.executionIntervalSeconds)}`} />
           <Stat label="Active since" value={bot.status === 'active' ? new Date(bot.updatedAt).toLocaleDateString() : '—'} />
         </dl>
       </div>
@@ -137,22 +141,38 @@ export function BotDetail({ botId }: { botId: string }) {
         </Link>
       </div>
 
-      <section aria-labelledby="recent-trades-heading">
-        <h2 id="recent-trades-heading" className="text-sm font-bold text-neutral-900">Recent trades</h2>
-        <div className="mt-3">
-          {tradesQuery.error ? (
-            <Notice text={describeApiError(tradesQuery.error).title} />
-          ) : trades.length === 0 ? (
+      {tradesQuery.error ? (
+        <section aria-labelledby="recent-trades-heading">
+          <h2 id="recent-trades-heading" className="text-sm font-bold text-neutral-900">Trades</h2>
+          <Notice text={describeApiError(tradesQuery.error).title} className="mt-3" />
+        </section>
+      ) : trades.length === 0 ? (
+        <section aria-labelledby="recent-trades-heading">
+          <h2 id="recent-trades-heading" className="text-sm font-bold text-neutral-900">Trades</h2>
+          <div className="mt-3">
             <EmptyState icon={XCircle} title="No trades yet" description="This bot hasn't placed a bet yet — it will appear here as soon as it does." />
-          ) : (
-            <ul className="space-y-2">
-              {trades.map((bet) => (
-                <BetRow key={bet.id} bet={bet} instrument={instrumentById.get(bet.instrumentId)} onClick={() => setOpenBetId(bet.id)} />
-              ))}
-            </ul>
+          </div>
+        </section>
+      ) : (
+        <>
+          <OpenPositions
+            bets={trades}
+            instruments={instrumentsQuery.data?.items ?? []}
+            emptyHint="This bot's next trade will appear here until it settles."
+          />
+
+          {trades.some((bet) => isSettledBetStatus(bet.status)) && (
+            <section aria-labelledby="trade-history-heading">
+              <h2 id="trade-history-heading" className="text-sm font-bold text-neutral-900">Trade history</h2>
+              <ul className="mt-3 space-y-2">
+                {trades.filter((bet) => isSettledBetStatus(bet.status)).map((bet) => (
+                  <BetRow key={bet.id} bet={bet} instrument={instrumentById.get(bet.instrumentId)} onClick={() => setOpenBetId(bet.id)} />
+                ))}
+              </ul>
+            </section>
           )}
-        </div>
-      </section>
+        </>
+      )}
 
       <section aria-labelledby="bot-logs-heading">
         <h2 id="bot-logs-heading" className="flex items-center gap-2 text-sm font-bold text-neutral-900">

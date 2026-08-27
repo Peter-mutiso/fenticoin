@@ -3,13 +3,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
-import { listInstruments, type StrategyCatalogEntry, type StrategyConfigField } from '@/lib/api-client';
+import {
+  DEFAULT_EXECUTION_INTERVAL_SECONDS,
+  EXECUTION_INTERVAL_OPTIONS,
+  listInstruments,
+  type StrategyCatalogEntry,
+  type StrategyConfigField,
+} from '@/lib/api-client';
 import { minorUnitsToDecimalString, parseStakeToMinorUnits } from '@/lib/money';
 import { Notice } from '@/components/ui/Notice';
 
 export interface BotConfigFormValue {
   name: string;
   config: Record<string, unknown>;
+  executionIntervalSeconds: number;
 }
 
 /**
@@ -25,6 +32,7 @@ export function BotConfigForm({
   entry,
   initialName = '',
   initialConfig = {},
+  initialExecutionIntervalSeconds = DEFAULT_EXECUTION_INTERVAL_SECONDS,
   submitLabel,
   submitting,
   error,
@@ -33,12 +41,14 @@ export function BotConfigForm({
   entry: StrategyCatalogEntry;
   initialName?: string;
   initialConfig?: Record<string, unknown>;
+  initialExecutionIntervalSeconds?: number;
   submitLabel: string;
   submitting: boolean;
   error?: string | null;
   onSubmit: (value: BotConfigFormValue) => void;
 }) {
   const [name, setName] = useState(initialName);
+  const [executionIntervalSeconds, setExecutionIntervalSeconds] = useState(initialExecutionIntervalSeconds);
   const initialCurrency = typeof initialConfig.currency === 'string' ? initialConfig.currency : 'USD';
   const [values, setValues] = useState<Record<string, string>>(() => toRawValues(entry, initialConfig, initialCurrency));
 
@@ -63,7 +73,7 @@ export function BotConfigForm({
     event.preventDefault();
     if (!canSubmit) return;
     const config = toConfig(entry, values, currency);
-    onSubmit({ name: name.trim(), config });
+    onSubmit({ name: name.trim(), config, executionIntervalSeconds });
   }
 
   return (
@@ -76,6 +86,32 @@ export function BotConfigForm({
           placeholder={`My ${entry.name}`}
           className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
         />
+      </label>
+
+      <label className="block text-sm font-semibold">
+        Execution interval
+        <select
+          aria-label="Execution interval"
+          value={executionIntervalSeconds}
+          onChange={(event) => setExecutionIntervalSeconds(Number(event.target.value))}
+          className="mt-2 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+        >
+          <optgroup label="Seconds">
+            {EXECUTION_INTERVAL_OPTIONS.filter((option) => option.group === 'Seconds').map((option) => (
+              <option key={option.seconds} value={option.seconds}>
+                {option.label}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Minutes">
+            {EXECUTION_INTERVAL_OPTIONS.filter((option) => option.group === 'Minutes').map((option) => (
+              <option key={option.seconds} value={option.seconds}>
+                {option.label}
+              </option>
+            ))}
+          </optgroup>
+        </select>
+        <span className="mt-1 block text-xs text-neutral-500">How often the server checks and, if the strategy signals, trades. Runs server-side even if this tab is closed.</span>
       </label>
 
       {entry.configFields.map((field) => {

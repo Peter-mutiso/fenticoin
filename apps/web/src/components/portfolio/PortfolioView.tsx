@@ -9,6 +9,7 @@ import { getWallet, isSettledBetStatus, listBets, listInstruments } from '@/lib/
 import { describeApiError } from '@/lib/api-errors';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { BetRow } from '@/components/betting/BetRow';
+import { OpenPositions } from '@/components/betting/OpenPositions';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Notice } from '@/components/ui/Notice';
 import { BalanceCard } from '@/components/wallet/BalanceCard';
@@ -28,7 +29,6 @@ export function PortfolioView() {
   );
 
   const bets = betsQuery.data?.items ?? [];
-  const openBets = bets.filter((bet) => !isSettledBetStatus(bet.status));
   const completedBets = bets.filter((bet) => isSettledBetStatus(bet.status));
 
   if (authStatus === 'unauthenticated') {
@@ -60,30 +60,17 @@ export function PortfolioView() {
 
       {completedBets.length > 0 && <PerformanceSummary settledBets={completedBets} currency={walletQuery.data?.currency ?? 'USD'} />}
 
-      <section aria-labelledby="open-positions-heading">
-        <h2 id="open-positions-heading" className="text-lg font-bold text-neutral-900">
-          Open positions
-        </h2>
-        <div className="mt-3">
-          {betsQuery.isLoading ? (
-            <div className="h-16 animate-pulse rounded-2xl bg-neutral-100" />
-          ) : betsQuery.error ? (
-            <Notice text={describeApiError(betsQuery.error).title} />
-          ) : openBets.length === 0 ? (
-            <EmptyState 
-              icon={Briefcase} 
-              title="You don't have any open positions." 
-              action={{ label: 'Place a bet', href: '/trade' }} 
-            />
-          ) : (
-            <ul className="space-y-2">
-              {openBets.map((bet) => (
-                <BetRow key={bet.id} bet={bet} instrument={instrumentById.get(bet.instrumentId)} />
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
+      {betsQuery.isLoading ? (
+        <div className="h-16 animate-pulse rounded-2xl bg-neutral-100" />
+      ) : betsQuery.error ? (
+        <Notice text={describeApiError(betsQuery.error).title} />
+      ) : (
+        <OpenPositions
+          bets={bets}
+          instruments={instrumentsQuery.data?.items ?? []}
+          emptyHint="You don't have any open positions."
+        />
+      )}
 
       <section aria-labelledby="completed-bets-heading">
         <h2 id="completed-bets-heading" className="text-lg font-bold text-neutral-900">

@@ -5,7 +5,7 @@ import { renderWithProviders } from '@/test-utils/render';
 import { Header } from './Header';
 
 const mockGetMe = jest.fn();
-const mockGetWallet = jest.fn();
+const mockGetDemoStatus = jest.fn();
 const mockListBets = jest.fn();
 const mockListDeposits = jest.fn();
 const mockListWithdrawals = jest.fn();
@@ -15,7 +15,7 @@ jest.mock('@/lib/api-client', () => {
   return {
     ...actual,
     getMe: (...args: unknown[]) => mockGetMe(...args),
-    getWallet: (...args: unknown[]) => mockGetWallet(...args),
+    getDemoStatus: (...args: unknown[]) => mockGetDemoStatus(...args),
     listBets: (...args: unknown[]) => mockListBets(...args),
     listDeposits: (...args: unknown[]) => mockListDeposits(...args),
     listWithdrawals: (...args: unknown[]) => mockListWithdrawals(...args),
@@ -46,12 +46,16 @@ describe('Header', () => {
     window.localStorage.clear();
     mockListDeposits.mockResolvedValue({ items: [] });
     mockListWithdrawals.mockResolvedValue({ items: [] });
+    mockListBets.mockResolvedValue({ items: [] });
   });
 
-  it('formats the wallet balance from minor units — never a raw Number() float conversion', async () => {
+  it('formats the active account balance from minor units — never a raw Number() float conversion', async () => {
     authenticate();
-    mockGetWallet.mockResolvedValue({ currency: 'USD', availableMinorUnits: '123456', available: '1234.56', lockedMinorUnits: '0', locked: '0.00' });
-    mockListBets.mockResolvedValue({ items: [] });
+    mockGetDemoStatus.mockResolvedValue({
+      current: 'real',
+      real: { userId: 'user-1', balance: { currency: 'USD', availableMinorUnits: '123456', available: '1234.56', lockedMinorUnits: '0', locked: '0.00' } },
+      demo: null,
+    });
 
     renderWithProviders(<Header />);
 
@@ -60,7 +64,11 @@ describe('Header', () => {
 
   it('shows an unread notification badge after a bet settles in-session', async () => {
     authenticate();
-    mockGetWallet.mockResolvedValue({ currency: 'USD', availableMinorUnits: '0', available: '0.00', lockedMinorUnits: '0', locked: '0.00' });
+    mockGetDemoStatus.mockResolvedValue({
+      current: 'real',
+      real: { userId: 'user-1', balance: { currency: 'USD', availableMinorUnits: '0', available: '0.00', lockedMinorUnits: '0', locked: '0.00' } },
+      demo: null,
+    });
 
     const openBet = {
       id: 'bet-1',
@@ -98,24 +106,34 @@ describe('Header', () => {
     await waitFor(() => expect(screen.getByLabelText(/notifications/i)).toHaveTextContent('1'));
   });
 
-  it('shows a persistent Demo Mode indicator for a demo account, and never for a real one', async () => {
+  it('shows a persistent Demo indicator and the demo balance for a demo account', async () => {
     authenticateAsDemo();
-    mockGetWallet.mockResolvedValue({ currency: 'USD', availableMinorUnits: '1000000', available: '10000.00', lockedMinorUnits: '0', locked: '0.00' });
-    mockListBets.mockResolvedValue({ items: [] });
+    mockGetDemoStatus.mockResolvedValue({
+      current: 'demo',
+      real: { userId: 'user-1', balance: { currency: 'USD', availableMinorUnits: '500000', available: '5000.00', lockedMinorUnits: '0', locked: '0.00' } },
+      demo: { userId: 'demo-user-1', balance: { currency: 'USD', availableMinorUnits: '1000000', available: '10000.00', lockedMinorUnits: '0', locked: '0.00' } },
+    });
 
     renderWithProviders(<Header />);
 
-    expect(await screen.findByText(/demo mode/i)).toBeInTheDocument();
+    const switcher = await screen.findByRole('button', { name: /switch account/i });
+    expect(switcher).toHaveTextContent('Demo');
+    await waitFor(() => expect(switcher).toHaveTextContent('$10000.00'));
   });
 
-  it('shows no Demo Mode indicator for a real account', async () => {
+  it('shows a Real indicator and the real balance for a real account', async () => {
     authenticate();
-    mockGetWallet.mockResolvedValue({ currency: 'USD', availableMinorUnits: '0', available: '0.00', lockedMinorUnits: '0', locked: '0.00' });
-    mockListBets.mockResolvedValue({ items: [] });
+    mockGetDemoStatus.mockResolvedValue({
+      current: 'real',
+      real: { userId: 'user-1', balance: { currency: 'USD', availableMinorUnits: '0', available: '0.00', lockedMinorUnits: '0', locked: '0.00' } },
+      demo: null,
+    });
 
     renderWithProviders(<Header />);
 
-    await waitFor(() => expect(screen.getByText('$0.00')).toBeInTheDocument());
-    expect(screen.queryByText(/demo mode/i)).not.toBeInTheDocument();
+    const switcher = await screen.findByRole('button', { name: /switch account/i });
+    expect(switcher).toHaveTextContent('Real');
+    expect(switcher).not.toHaveTextContent('Demo');
+    await waitFor(() => expect(switcher).toHaveTextContent('$0.00'));
   });
 });

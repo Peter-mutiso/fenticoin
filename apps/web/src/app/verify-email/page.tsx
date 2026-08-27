@@ -58,7 +58,7 @@ function VerifyEmailContent() {
   if (state === 'missing-token' || state === 'error') {
     return (
       <div className="text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-loss-50 text-loss-500">
           <AlertCircle className="h-6 w-6" />
         </div>
         <h1 className="mt-5 text-2xl font-bold">We couldn&rsquo;t verify your email</h1>
@@ -86,7 +86,7 @@ function VerifyEmailContent() {
 
 export default function VerifyEmailPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f7f9fc] px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-white px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-8 flex justify-center">
           <Logo />

@@ -1,7 +1,14 @@
 import { BotExecutionService } from './bot-execution.service';
 
 describe('BotExecutionService', () => {
-  const bot = { id: 'bot-1', userId: 'user-1', status: 'active', strategyKey: 'future', createdAt: new Date('2026-01-01T00:00:00.000Z') } as never;
+  const bot = {
+    id: 'bot-1',
+    userId: 'user-1',
+    status: 'active',
+    strategyKey: 'future',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    executionIntervalSeconds: 45,
+  } as never;
 
   function chainResolving(value: unknown) {
     return { from: jest.fn().mockReturnValue({ where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue(value) }) }) };
@@ -54,6 +61,16 @@ describe('BotExecutionService', () => {
     );
     expect(h.auditLog.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'bot.bet_placed', targetId: 'bot-1' }));
     expect(h.db.insert).toHaveBeenCalled();
+  });
+
+  it("passes the bot's own configured executionIntervalSeconds into the strategy context — the scheduler honors whatever interval the bot was created with", async () => {
+    const strategy = { key: 'future', evaluate: jest.fn().mockResolvedValue(signal) };
+    const h = makeService(strategy);
+    const now = new Date('2026-01-01T00:00:00.000Z');
+
+    await h.service.execute('bot-1', now);
+
+    expect(strategy.evaluate).toHaveBeenCalledWith(expect.objectContaining({ executionIntervalSeconds: 45 }));
   });
 
   it('never calls placeBet twice for the same schedule slot — the pre-check finds the already-placed bet', async () => {

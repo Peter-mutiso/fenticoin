@@ -6,14 +6,27 @@ export function PriceQuoteBadge({
   currency,
   loading,
   className = '',
+  compact = false,
 }: {
   price?: PriceQuote;
   currency: string;
   loading: boolean;
   className?: string;
+  /** A single-line price only — no source/timestamp footer — for tight spaces like a market list row or watchlist tile, where the full badge's unwrapped footer text would force the row wider than its container. */
+  compact?: boolean;
 }) {
-  if (loading) return <p className={`text-sm text-neutral-500 ${className}`}>Getting latest price…</p>;
+  if (loading) return <p className={`text-sm text-neutral-500 ${className}`}>{compact ? '…' : 'Getting latest price…'}</p>;
   if (!price) return null;
+
+  if (compact) {
+    return (
+      <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-bold tabular-nums ${price.isStale ? 'text-loss-500' : 'text-neutral-900'} ${className}`}>
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${price.isStale ? 'bg-loss-500' : 'bg-brand-500'}`} aria-hidden="true" title={price.isStale ? 'Stale price' : 'Live price'} />
+        {price.price} {currency}
+      </span>
+    );
+  }
+
   return (
     <div className={`rounded-xl p-3 ${price.isStale ? 'bg-loss-50 text-loss-500' : 'bg-neutral-50'} ${className}`}>
       <div className="flex justify-between">

@@ -14,23 +14,21 @@ interface MomentumConfig {
   rsiPeriod?: number;
   oversoldThreshold?: number;
   overboughtThreshold?: number;
-  evaluationIntervalSeconds?: number;
 }
 
 const DEFAULTS = {
   rsiPeriod: 14,
   oversoldThreshold: 30,
   overboughtThreshold: 70,
-  evaluationIntervalSeconds: 60,
 };
 
 /**
  * A real, deterministic momentum strategy: computes RSI from the
  * instrument's actual recorded `price_ticks` history and signals only
  * when it crosses a configured threshold. Never random. `dedupeKey` is a
- * time bucket derived from `evaluationIntervalSeconds`, so however often
- * the scheduler ticks, the strategy is only ever evaluated into a real
- * bet once per window.
+ * time bucket derived from the bot's shared `executionIntervalSeconds`
+ * (see `execution-interval.ts`), so however often the scheduler ticks,
+ * the strategy is only ever evaluated into a real bet once per window.
  */
 @Injectable()
 export class MomentumStrategy implements StrategyProvider {
@@ -45,7 +43,7 @@ export class MomentumStrategy implements StrategyProvider {
     const period = config.rsiPeriod ?? DEFAULTS.rsiPeriod;
     const oversold = config.oversoldThreshold ?? DEFAULTS.oversoldThreshold;
     const overbought = config.overboughtThreshold ?? DEFAULTS.overboughtThreshold;
-    const evaluationIntervalSeconds = config.evaluationIntervalSeconds ?? DEFAULTS.evaluationIntervalSeconds;
+    const evaluationIntervalSeconds = context.executionIntervalSeconds;
 
     const rows = await this.db
       .select({ price: priceTicks.price })

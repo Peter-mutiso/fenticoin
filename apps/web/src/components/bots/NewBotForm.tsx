@@ -11,11 +11,17 @@ import { BotConfigForm } from './BotConfigForm';
 export function NewBotForm() {
   const searchParams = useSearchParams();
   const strategyKey = searchParams.get('strategy') ?? '';
+  const presetKey = searchParams.get('preset');
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const catalogQuery = useQuery({ queryKey: ['bots', 'catalog'], queryFn: getBotCatalog });
   const entry = catalogQuery.data?.items.find((item) => item.key === strategyKey);
+  // A "Recommended Bots" preset only ever pre-fills this form — see
+  // `bot-presets.ts` on the API. The bot that gets created still goes
+  // through the exact same `createBot` call, validated the same way,
+  // as one built from scratch.
+  const preset = presetKey ? catalogQuery.data?.presets.find((item) => item.key === presetKey && item.strategyKey === strategyKey) : undefined;
 
   const createMutation = useMutation({
     mutationFn: createBot,
@@ -40,10 +46,15 @@ export function NewBotForm() {
   return (
     <BotConfigForm
       entry={entry}
+      initialName={preset?.name ?? ''}
+      initialConfig={preset?.defaultConfig ?? {}}
+      initialExecutionIntervalSeconds={preset?.executionIntervalSeconds}
       submitLabel="Create bot"
       submitting={createMutation.isPending}
       error={createMutation.error ? describeApiError(createMutation.error).title : null}
-      onSubmit={(value) => createMutation.mutate({ name: value.name, strategyKey: entry.key, config: value.config })}
+      onSubmit={(value) =>
+        createMutation.mutate({ name: value.name, strategyKey: entry.key, config: value.config, executionIntervalSeconds: value.executionIntervalSeconds })
+      }
     />
   );
 }

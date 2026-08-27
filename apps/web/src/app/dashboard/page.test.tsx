@@ -10,6 +10,8 @@ jest.mock('@/lib/api-client', () => {
   return {
     ...actual,
     listInstruments: jest.fn().mockResolvedValue({ items: [] }),
+    listBets: jest.fn().mockResolvedValue({ items: [] }),
+    listBots: jest.fn().mockResolvedValue({ items: [], summary: { totalBots: 0, activeBots: 0, weeklyReturnPercent: null } }),
     getMe: (...args: unknown[]) => mockGetMe(...args),
   };
 });
@@ -46,12 +48,20 @@ describe('DashboardPage', () => {
     mockGetMe.mockRejectedValue(new Error('Unauthorized'));
   });
 
-  it('renders the betting experience heading and the review-bet action once authenticated', async () => {
+  it('renders a true at-a-glance summary — balance, open positions, bots, and recent activity — rather than the full trade builder', async () => {
     authenticate();
     renderWithProviders(<DashboardPage />);
 
-    expect(await screen.findByRole('heading', { name: /make a prediction/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /review bet/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^dashboard$/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /open positions/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^bots$/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /recent activity/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /start a trade/i })).toHaveAttribute('href', '/trade');
+
+    // The dashboard must summarize the account, not duplicate the full trade
+    // page's bet-placement form — that regression is exactly what this test guards against.
+    expect(screen.queryByRole('heading', { name: /make a prediction/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /review bet/i })).not.toBeInTheDocument();
   });
 
   it('shows an honest empty state for featured markets rather than inventing instruments', async () => {
@@ -65,6 +75,6 @@ describe('DashboardPage', () => {
     renderWithProviders(<DashboardPage />);
 
     await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith(expect.stringContaining('/login')));
-    expect(screen.queryByRole('heading', { name: /make a prediction/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /^dashboard$/i })).not.toBeInTheDocument();
   });
 });

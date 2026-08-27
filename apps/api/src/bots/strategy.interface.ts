@@ -3,6 +3,14 @@ import type { BetType, Bot } from '../database/schema';
 export interface StrategyContext {
   bot: Bot;
   now: Date;
+  /**
+   * The bot's configured execution interval, in seconds (mirrors
+   * `bot.executionIntervalSeconds` — passed explicitly rather than having
+   * every strategy read it off `bot` itself, so the interval concept
+   * stays owned by `BotExecutionService`/the schema, not duplicated into
+   * each strategy's own config parsing).
+   */
+  executionIntervalSeconds: number;
 }
 
 export interface StrategySignal {

@@ -11,6 +11,7 @@ const mockListBets = jest.fn();
 const mockListBotLogs = jest.fn();
 const mockActivateBot = jest.fn();
 const mockDeactivateBot = jest.fn();
+const mockGetPrice = jest.fn();
 
 jest.mock('@/lib/api-client', () => {
   const actual = jest.requireActual('@/lib/api-client');
@@ -23,6 +24,7 @@ jest.mock('@/lib/api-client', () => {
     listBotLogs: (...args: unknown[]) => mockListBotLogs(...args),
     activateBot: (...args: unknown[]) => mockActivateBot(...args),
     deactivateBot: (...args: unknown[]) => mockDeactivateBot(...args),
+    getPrice: (...args: unknown[]) => mockGetPrice(...args),
   };
 });
 
@@ -33,6 +35,7 @@ const BOT_INACTIVE = {
   status: 'inactive' as const,
   strategyKey: 'dca_recurring',
   config: { currency: 'USD' },
+  executionIntervalSeconds: 300,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   stats: { totalExecutions: 0, totalTrades: 0, totalPnlMinorUnits: '0' },
@@ -92,5 +95,34 @@ describe('BotDetail', () => {
 
     expect(await screen.findByText('Placed a rise_fall bet (rise).')).toBeInTheDocument();
     expect(screen.getByText('+$2.50', { exact: false })).toBeInTheDocument();
+  });
+
+  it('shows the bot\'s own configured execution interval', async () => {
+    mockGetBot.mockResolvedValue({ ...BOT_INACTIVE, executionIntervalSeconds: 15 });
+    renderWithProviders(<BotDetail botId="bot-1" />);
+
+    await screen.findByText('BTC weekly');
+    expect(screen.getByText('Every 15 seconds')).toBeInTheDocument();
+  });
+
+  it("shows an open position under Open positions, separate from settled trade history", async () => {
+    mockGetBot.mockResolvedValue({ ...BOT_INACTIVE, status: 'active' });
+    mockListInstruments.mockResolvedValue({ items: [{ id: 'inst-1', symbol: 'BTC', quoteCurrency: 'USD', displaySymbol: 'BTC/USD', name: 'Bitcoin', categoryKey: 'crypto', pricePrecision: 2, status: 'active', maxPriceAgeSeconds: 30 }] });
+    mockGetPrice.mockResolvedValue({ instrumentId: 'inst-1', price: '100.00', priceMinorUnits: '10000', currency: 'USD', source: 'test', observedAt: new Date().toISOString(), receivedAt: new Date().toISOString(), isStale: false });
+    mockListBets.mockResolvedValue({
+      items: [
+        {
+          id: 'bet-open', userId: 'user-1', instrumentId: 'inst-1', type: 'rise_fall', selection: 'rise', stakeAmountMinorUnits: '1000', currency: 'USD',
+          entryPriceMinorUnits: '9000', entryPriceObservedAt: new Date().toISOString(), targetPriceMinorUnits: null, payoutRateBasisPoints: '8500',
+          potentialPayoutMinorUnits: '1850', status: 'open', result: null, placedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          settlementPriceMinorUnits: null, settlementPriceObservedAt: null, settledAt: null, placementTransactionId: null, settlementTransactionId: null, cancelReason: null, botId: 'bot-1',
+        },
+      ],
+    });
+
+    renderWithProviders(<BotDetail botId="bot-1" />);
+
+    expect(await screen.findByRole('heading', { name: /open positions/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /trade history/i })).not.toBeInTheDocument();
   });
 });

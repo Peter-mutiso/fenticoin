@@ -1,9 +1,20 @@
-import { pgEnum, pgTable, index, jsonb, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { pgEnum, pgTable, check, index, integer, jsonb, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 import { bets } from './betting';
 import { users } from './users';
 
 export const botStatusEnum = pgEnum('bot_status', ['inactive', 'active', 'strategy_unconfigured']);
+
+/**
+ * The canonical, finite set of execution intervals — see
+ * `bots/execution-interval.ts` for the shared TS list this constraint
+ * must stay in sync with. Kept as a database-level CHECK (not just
+ * application validation) so a bot's interval can never end up outside
+ * the supported set no matter what writes the row — the same
+ * defense-in-depth pattern as `users_account_type_shape`.
+ */
+const ALLOWED_EXECUTION_INTERVAL_SECONDS_SQL = '(5, 10, 15, 30, 45, 60, 120, 300, 600, 900, 1800, 3600)';
 
 /**
  * A user-owned automated strategy runner. Unlike most tables here, a user
@@ -25,11 +36,23 @@ export const bots = pgTable('bots', {
   status: botStatusEnum('status').notNull().default('strategy_unconfigured'),
   strategyKey: text('strategy_key'),
   config: jsonb('config').notNull().default({}),
+  /**
+   * How often (in seconds) the strategy is allowed to act — see
+   * `bots/execution-interval.ts`. Bot-level rather than part of `config`
+   * because every strategy shares the same concept and validation now;
+   * `BotExecutionService` reads this directly to bucket evaluations,
+   * strategies never see their own bespoke interval field anymore.
+   */
+  executionIntervalSeconds: integer('execution_interval_seconds').notNull().default(300),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index('bots_user_id_idx').on(table.userId),
   index('bots_status_idx').on(table.status),
+  check(
+    'bots_execution_interval_seconds_allowed',
+    sql`${table.executionIntervalSeconds} IN ${sql.raw(ALLOWED_EXECUTION_INTERVAL_SECONDS_SQL)}`,
+  ),
 ]);
 
 export type Bot = typeof bots.$inferSelect;

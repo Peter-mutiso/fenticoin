@@ -27,7 +27,7 @@ export class BotExecutionService {
 
     let signal: StrategySignal | null;
     try {
-      signal = await strategy.evaluate({ bot, now });
+      signal = await strategy.evaluate({ bot, now, executionIntervalSeconds: bot.executionIntervalSeconds });
     } catch (error) {
       await this.writeLog(bot.id, 'error', `Strategy evaluation failed: ${describeError(error)}`);
       return false;

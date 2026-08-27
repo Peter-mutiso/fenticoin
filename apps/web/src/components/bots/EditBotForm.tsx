@@ -17,7 +17,7 @@ export function EditBotForm({ botId }: { botId: string }) {
   const entry = catalogQuery.data?.items.find((item) => item.key === botQuery.data?.strategyKey);
 
   const updateMutation = useMutation({
-    mutationFn: (value: { name: string; config: Record<string, unknown> }) => updateBot(botId, value),
+    mutationFn: (value: { name: string; config: Record<string, unknown>; executionIntervalSeconds: number }) => updateBot(botId, value),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['bots'] }),
@@ -47,6 +47,7 @@ export function EditBotForm({ botId }: { botId: string }) {
       entry={entry}
       initialName={bot.name}
       initialConfig={bot.config}
+      initialExecutionIntervalSeconds={bot.executionIntervalSeconds}
       submitLabel="Save changes"
       submitting={updateMutation.isPending}
       error={updateMutation.error ? describeApiError(updateMutation.error).title : null}

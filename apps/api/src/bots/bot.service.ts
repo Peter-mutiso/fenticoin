@@ -6,6 +6,7 @@ import { DRIZZLE_CLIENT } from '../database/database.constants';
 import type { DrizzleDb } from '../database/database.types';
 import { bets, bots, tradingBotLogs, type Bot, type TradingBotLog } from '../database/schema';
 import { InstrumentService } from '../markets/instrument.service';
+import { DEFAULT_EXECUTION_INTERVAL_SECONDS } from './execution-interval';
 import { findStrategyCatalogEntry } from './strategy-catalog';
 import { validateStrategyConfig } from './strategy-config.validator';
 
@@ -53,15 +54,19 @@ export class BotService {
     return { bot, stats: await this.computeStats(bot.id) };
   }
 
-  async create(userId: string, input: { name: string; strategyKey: string; config: unknown }): Promise<Bot> {
+  async create(
+    userId: string,
+    input: { name: string; strategyKey: string; config: unknown; executionIntervalSeconds?: number },
+  ): Promise<Bot> {
     const entry = findStrategyCatalogEntry(input.strategyKey);
     if (!entry || entry.comingSoon) throw new BadRequestException('Unknown or unavailable strategy');
 
     const config = await this.validateAndResolveConfig(entry.key, input.config);
+    const executionIntervalSeconds = input.executionIntervalSeconds ?? DEFAULT_EXECUTION_INTERVAL_SECONDS;
 
     const [created] = await this.db
       .insert(bots)
-      .values({ userId, name: input.name, strategyKey: input.strategyKey, config, status: 'inactive' })
+      .values({ userId, name: input.name, strategyKey: input.strategyKey, config, executionIntervalSeconds, status: 'inactive' })
       .returning();
     if (!created) throw new Error('Failed to create bot');
 
@@ -75,7 +80,11 @@ export class BotService {
     return created;
   }
 
-  async update(userId: string, botId: string, patch: { name?: string; config?: unknown }): Promise<Bot> {
+  async update(
+    userId: string,
+    botId: string,
+    patch: { name?: string; config?: unknown; executionIntervalSeconds?: number },
+  ): Promise<Bot> {
     const bot = await this.getOwned(userId, botId);
     if (bot.status === 'active') {
       throw new ConflictException('Deactivate the bot before changing its configuration');
@@ -86,6 +95,9 @@ export class BotService {
     if (patch.config !== undefined) {
       if (!bot.strategyKey) throw new ConflictException('Bot has no configured strategy');
       updates.config = await this.validateAndResolveConfig(bot.strategyKey, patch.config);
+    }
+    if (patch.executionIntervalSeconds !== undefined) {
+      updates.executionIntervalSeconds = patch.executionIntervalSeconds;
     }
 
     const [updated] = await this.db
