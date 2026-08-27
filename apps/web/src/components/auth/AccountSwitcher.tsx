@@ -32,6 +32,7 @@ export function AccountSwitcher() {
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState<'real' | 'demo' | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const statusQuery = useQuery({
     queryKey: ['demo-status'],
@@ -46,8 +47,17 @@ export function AccountSwitcher() {
       if (switching) return;
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
     }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape' || switching) return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    }
     document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [open, switching]);
 
   if (authStatus !== 'authenticated') return null;
@@ -77,12 +87,15 @@ export function AccountSwitcher() {
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Switch account"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className={`flex items-center gap-1.5 rounded-full py-2 pl-3 pr-2.5 text-white transition sm:pl-3.5 ${
-          isDemo ? 'bg-brand-600' : 'bg-navy-950'
+        className={`flex items-center gap-1.5 rounded-full py-2 pl-3 pr-2.5 transition sm:pl-3.5 ${
+          // `brand-600` is only accessible with dark text (white-on-brand-600 is ~3.2:1,
+          // below WCAG AA) — `navy-950` is dark enough itself that white text is fine.
+          isDemo ? 'bg-brand-600 text-navy-950' : 'bg-navy-950 text-white'
         }`}
       >
         {isDemo ? <FlaskConical className="h-4 w-4" aria-hidden="true" /> : <ShieldCheck className="h-4 w-4 text-brand-500" aria-hidden="true" />}
@@ -165,11 +178,11 @@ function AccountRow({
       }`}
     >
       <span className="flex items-center gap-2">
-        <Icon className={`h-4 w-4 ${active ? 'text-brand-600' : 'text-neutral-400'}`} aria-hidden="true" />
+        <Icon className={`h-4 w-4 ${active ? 'text-brand-700' : 'text-neutral-400'}`} aria-hidden="true" />
         <span>
           <span className={`block text-sm font-bold ${active ? 'text-brand-700' : 'text-neutral-900'}`}>
             {label}
-            {active && <span className="ml-1.5 font-normal text-brand-600">· Active</span>}
+            {active && <span className="ml-1.5 font-normal text-brand-700">· Active</span>}
           </span>
           {helperText && <span className="mt-0.5 block text-xs text-neutral-500">{helperText}</span>}
         </span>

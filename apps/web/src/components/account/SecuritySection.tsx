@@ -48,7 +48,7 @@ export function SecuritySection() {
           type="button"
           onClick={handleLogoutAll}
           disabled={submitting !== null}
-          className="rounded-full bg-loss-50 px-4 py-2 text-sm font-semibold text-loss-500 transition hover:bg-red-100 disabled:opacity-60"
+          className="rounded-full bg-loss-50 px-4 py-2 text-sm font-semibold text-loss-700 transition hover:bg-red-100 disabled:opacity-60"
         >
           {submitting === 'logout-all' ? 'Logging out…' : 'Log out of all devices'}
         </button>

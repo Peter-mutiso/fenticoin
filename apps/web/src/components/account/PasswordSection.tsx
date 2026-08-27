@@ -29,9 +29,9 @@ export function PasswordSection({ email }: { email: string }) {
   return (
     <AccountSection title="Password" description="Change your password by requesting a reset link — there's no in-app password change yet.">
       {sent ? (
-        <p className="text-sm font-semibold text-brand-600">Check {email} for a password reset link.</p>
+        <p className="text-sm font-semibold text-brand-700">Check {email} for a password reset link.</p>
       ) : (
-        <button type="button" onClick={handleSend} disabled={submitting} className="rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-600 disabled:opacity-60">
+        <button type="button" onClick={handleSend} disabled={submitting} className="rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-navy-950 transition hover:bg-brand-600 disabled:opacity-60">
           {submitting ? 'Sending…' : 'Send password reset email'}
         </button>
       )}

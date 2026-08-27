@@ -33,7 +33,7 @@ function ResetPasswordForm() {
         </div>
         <h1 className="mt-5 text-2xl font-bold">This link is invalid or has expired</h1>
         <p className="mt-2 text-sm leading-6 text-neutral-500">Request a new password reset link and try again.</p>
-        <Link href="/forgot-password" className="mt-7 inline-flex items-center gap-2 font-bold text-brand-600">
+        <Link href="/forgot-password" className="mt-7 inline-flex items-center gap-2 font-bold text-brand-700">
           <ArrowLeft className="h-4 w-4" /> Request a new link
         </Link>
       </div>
@@ -43,7 +43,7 @@ function ResetPasswordForm() {
   if (done) {
     return (
       <div className="text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
           <CheckCircle2 className="h-6 w-6" />
         </div>
         <h1 className="mt-5 text-2xl font-bold">Password reset</h1>
@@ -51,7 +51,7 @@ function ResetPasswordForm() {
         <button
           type="button"
           onClick={() => router.replace('/login')}
-          className="mt-7 inline-flex items-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-brand-600"
+          className="mt-7 inline-flex items-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-bold text-navy-950 transition hover:bg-brand-600"
         >
           Go to login
         </button>
@@ -81,7 +81,7 @@ function ResetPasswordForm() {
   return (
     <>
       <div className="mb-7">
-        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
           <KeyRound className="h-5 w-5" />
         </div>
         <h1 className="text-2xl font-bold">Set a new password</h1>
@@ -123,7 +123,7 @@ function ResetPasswordForm() {
         <button
           type="submit"
           disabled={submitting}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-3.5 font-bold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-3.5 font-bold text-navy-950 transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
           Reset password

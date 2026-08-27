@@ -14,6 +14,7 @@ export function NotificationBell() {
   const { notifications, unreadCount, markRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -22,8 +23,17 @@ export function NotificationBell() {
         setOpen(false);
       }
     }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    }
     document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [open]);
 
   if (status !== 'authenticated') return null;
@@ -33,6 +43,7 @@ export function NotificationBell() {
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Notifications"
         aria-expanded={open}
@@ -51,7 +62,7 @@ export function NotificationBell() {
         <div className="absolute right-0 top-11 z-30 w-72 rounded-2xl border border-neutral-200 bg-white p-2 shadow-lg sm:top-12">
           <div className="flex items-center justify-between px-3 py-2">
             <p className="text-sm font-bold text-neutral-900">Notifications</p>
-            <Link href="/notifications" onClick={() => setOpen(false)} className="text-xs font-semibold text-brand-600 hover:underline">
+            <Link href="/notifications" onClick={() => setOpen(false)} className="text-xs font-semibold text-brand-700 hover:underline">
               View all
             </Link>
           </div>

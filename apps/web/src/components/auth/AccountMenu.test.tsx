@@ -90,4 +90,18 @@ describe('AccountMenu', () => {
 
     await waitFor(() => expect(mockLogout).toHaveBeenCalled());
   });
+
+  it('closes on Escape and returns focus to the trigger', async () => {
+    authenticate('real');
+    renderWithProviders(<AccountMenu />);
+
+    const trigger = await screen.findByLabelText('Account');
+    await userEvent.click(trigger);
+    expect(screen.getByRole('button', { name: /log out/i })).toBeInTheDocument();
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByRole('button', { name: /log out/i })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
 });

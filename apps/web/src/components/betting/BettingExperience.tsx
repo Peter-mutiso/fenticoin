@@ -210,7 +210,7 @@ export function BettingExperience() {
     <section className="pb-8" aria-labelledby="betting-heading">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-brand-600">FentiCoin Markets</p>
+          <p className="text-sm font-semibold text-brand-700">FentiCoin Markets</p>
           <h1 id="betting-heading" className="mt-1 text-3xl font-bold tracking-tight">
             Make a prediction
           </h1>
@@ -225,7 +225,7 @@ export function BettingExperience() {
       {authStatus === 'unauthenticated' && (
         <div className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4">
           <p className="text-sm font-semibold text-brand-700">Log in to see live odds, your balance, and place a bet.</p>
-          <Link href="/login" className="shrink-0 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-600">
+          <Link href="/login" className="shrink-0 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-navy-950 transition hover:bg-brand-600">
             Log in
           </Link>
         </div>
@@ -242,7 +242,7 @@ export function BettingExperience() {
                   type="button"
                   onClick={() => setType(item.type)}
                   className={`rounded-xl border px-2 py-3 text-left transition ${
-                    type === item.type ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-neutral-200 hover:border-neutral-300'
+                    type === item.type ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-neutral-200 hover:border-neutral-300'
                   }`}
                 >
                   <span className="block text-xs font-bold sm:text-sm">{item.title}</span>
@@ -281,7 +281,7 @@ export function BettingExperience() {
                   type="button"
                   onClick={() => setSelection(choice)}
                   className={`flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-bold capitalize transition ${
-                    selection === choice ? (index === 0 ? 'bg-brand-500 text-white' : 'bg-loss-500 text-white') : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                    selection === choice ? (index === 0 ? 'bg-brand-500 text-navy-950' : 'bg-loss-500 text-white') : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                   }`}
                 >
                   {index === 0 ? <ArrowUp className="h-4 w-4" aria-hidden="true" /> : <ArrowDown className="h-4 w-4" aria-hidden="true" />}
@@ -334,7 +334,7 @@ export function BettingExperience() {
                         type="button"
                         onClick={() => setDurationSeconds(preset.seconds)}
                         className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-                          durationSeconds === preset.seconds ? 'bg-brand-500 text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                          durationSeconds === preset.seconds ? 'bg-brand-500 text-navy-950' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                         }`}
                       >
                         {preset.label}
@@ -467,7 +467,7 @@ function ReviewModal({
             type="button"
             disabled={submitting}
             onClick={onConfirm}
-            className="flex items-center justify-center rounded-full bg-brand-500 px-4 py-3 font-semibold text-white disabled:opacity-60"
+            className="flex items-center justify-center rounded-full bg-brand-500 px-4 py-3 font-semibold text-navy-950 disabled:opacity-60"
           >
             {submitting ? (
               <>

@@ -94,20 +94,20 @@ export function TwoFactorSection() {
           <button
             type="submit"
             disabled={submitting || code.trim().length !== 6}
-            className="rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-navy-950 transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? 'Confirming…' : 'Confirm'}
           </button>
         </form>
       ) : (
-        <button type="button" onClick={handleSetup} disabled={submitting} className="rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-600 disabled:opacity-60">
+        <button type="button" onClick={handleSetup} disabled={submitting} className="rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-navy-950 transition hover:bg-brand-600 disabled:opacity-60">
           {submitting ? 'Starting…' : 'Set up 2FA'}
         </button>
       )}
 
       <div className="mt-5 border-t border-neutral-100 pt-4">
         {!showDisable ? (
-          <button type="button" onClick={() => setShowDisable(true)} className="text-sm font-semibold text-loss-500 hover:underline">
+          <button type="button" onClick={() => setShowDisable(true)} className="text-sm font-semibold text-loss-700 hover:underline">
             Disable 2FA
           </button>
         ) : (

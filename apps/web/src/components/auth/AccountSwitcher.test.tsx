@@ -125,4 +125,19 @@ describe('AccountSwitcher', () => {
     renderWithProviders(<AccountSwitcher />);
     expect(screen.queryByRole('button', { name: /switch account/i })).not.toBeInTheDocument();
   });
+
+  it('closes on Escape and returns focus to the trigger, like every other dialog/menu in the app', async () => {
+    authenticate('real');
+    mockGetDemoStatus.mockResolvedValue({ current: 'real', real: { userId: 'user-1', balance: REAL_BALANCE }, demo: { userId: 'demo-user-1', balance: DEMO_BALANCE } });
+    renderWithProviders(<AccountSwitcher />);
+
+    const trigger = await screen.findByRole('button', { name: /switch account/i });
+    await userEvent.click(trigger);
+    expect(screen.getByText(/demo account/i)).toBeInTheDocument();
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByText(/demo account/i)).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
 });

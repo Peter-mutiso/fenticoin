@@ -39,7 +39,7 @@ export function NotificationList() {
           type="button"
           onClick={markAllRead}
           disabled={unreadCount === 0}
-          className="text-sm font-semibold text-brand-600 transition hover:underline disabled:cursor-not-allowed disabled:text-neutral-300 disabled:no-underline"
+          className="text-sm font-semibold text-brand-700 transition hover:underline disabled:cursor-not-allowed disabled:text-neutral-300 disabled:no-underline"
         >
           Mark all read
         </button>

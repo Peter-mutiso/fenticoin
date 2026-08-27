@@ -18,7 +18,7 @@ export function EmptyState({
       <p className="text-sm font-semibold text-neutral-900">{title}</p>
       {description && <p className="max-w-xs text-sm text-neutral-500">{description}</p>}
       {action && (
-        <Link href={action.href} className="mt-2 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-600">
+        <Link href={action.href} className="mt-2 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-navy-950 transition hover:bg-brand-600">
           {action.label}
         </Link>
       )}

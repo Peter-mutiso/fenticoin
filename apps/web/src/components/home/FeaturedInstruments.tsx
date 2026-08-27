@@ -18,7 +18,7 @@ export function FeaturedInstruments() {
         <h2 id="featured-heading" className="text-lg font-bold text-neutral-900">
           Watchlist
         </h2>
-        <Link href="/markets" className="text-sm font-semibold text-brand-600 hover:underline">
+        <Link href="/markets" className="text-sm font-semibold text-brand-700 hover:underline">
           See All &gt;
         </Link>
       </div>

@@ -37,7 +37,7 @@ export default function LoginPage() {
             </div>
             <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,.08)] sm:p-9">
               <div className="mb-7">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-600"><LockKeyhole className="h-5 w-5" /></div>
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-700"><LockKeyhole className="h-5 w-5" /></div>
                 <h1 className="text-2xl font-bold tracking-tight">Log in</h1>
                 <p className="mt-2 text-sm leading-6 text-neutral-500">Access your account and continue where you left off.</p>
               </div>
@@ -46,7 +46,7 @@ export default function LoginPage() {
               </Suspense>
               <div className="mt-6 flex items-center justify-center gap-1 text-sm text-neutral-500">
                 <span>Don&rsquo;t have an account?</span>
-                <Link href="/signup" className="font-bold text-brand-600 hover:text-brand-700">Create one</Link>
+                <Link href="/signup" className="font-bold text-brand-700 hover:text-brand-600">Create one</Link>
               </div>
               <p className="mt-2 text-center text-xs text-neutral-400">
                 New here?{' '}

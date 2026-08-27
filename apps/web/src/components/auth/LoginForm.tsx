@@ -64,7 +64,7 @@ export function LoginForm() {
           <input id="code" inputMode="numeric" autoComplete="one-time-code" required value={code} onChange={(e) => setCode(e.target.value)} className="mt-2 w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-lg tracking-widest outline-none focus:ring-2 focus:ring-brand-500" />
         </div>
         {error && <Notice text={error} />}
-        <button type="submit" disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-3.5 font-bold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60">{submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}Verify and sign in</button>
+        <button type="submit" disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-3.5 font-bold text-navy-950 transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60">{submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}Verify and sign in</button>
         <button type="button" onClick={() => { setStep({ kind: 'credentials' }); setError(null); }} className="w-full text-center text-sm font-semibold text-neutral-500 hover:text-neutral-800">Back</button>
       </form>
     );
@@ -75,13 +75,13 @@ export function LoginForm() {
       <div><label htmlFor="email" className="text-sm font-semibold text-neutral-800">Email address</label>
         <input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-2 w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 outline-none focus:ring-2 focus:ring-brand-500" placeholder="you@example.com" />
       </div>
-      <div><div className="flex items-center justify-between"><label htmlFor="password" className="text-sm font-semibold text-neutral-800">Password</label><Link href="/forgot-password" className="text-xs font-bold text-brand-600 hover:text-brand-700">Forgot password?</Link></div>
+      <div><div className="flex items-center justify-between"><label htmlFor="password" className="text-sm font-semibold text-neutral-800">Password</label><Link href="/forgot-password" className="text-xs font-bold text-brand-700 hover:text-brand-600">Forgot password?</Link></div>
         <div className="relative mt-2"><input id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 pr-12 outline-none focus:ring-2 focus:ring-brand-500" placeholder="Your password" />
           <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-neutral-400" aria-label="Toggle password visibility">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
         </div>
       </div>
       {error && <Notice text={error} />}
-      <button type="submit" disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-3.5 font-bold text-white shadow-lg shadow-brand-500/20 transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60">
+      <button type="submit" disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-3.5 font-bold text-navy-950 shadow-lg shadow-brand-500/20 transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60">
         {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}Log in
       </button>
     </form>

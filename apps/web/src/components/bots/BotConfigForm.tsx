@@ -137,7 +137,7 @@ export function BotConfigForm({
       <button
         type="submit"
         disabled={!canSubmit}
-        className="w-full rounded-full bg-brand-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-400"
+        className="w-full rounded-full bg-brand-500 px-4 py-3 text-sm font-bold text-navy-950 transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-400"
       >
         {submitting ? 'Saving…' : submitLabel}
       </button>

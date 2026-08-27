@@ -9,7 +9,7 @@ import { AlertCircle, Info } from 'lucide-react';
  * failure and shouldn't read like one.
  */
 export function Notice({ text, tone = 'error', className = '' }: { text: string; tone?: 'error' | 'info'; className?: string }) {
-  const toneClasses = tone === 'info' ? 'bg-neutral-100 text-neutral-600' : 'bg-loss-50 text-loss-500';
+  const toneClasses = tone === 'info' ? 'bg-neutral-100 text-neutral-600' : 'bg-loss-50 text-loss-700';
   const Icon = tone === 'info' ? Info : AlertCircle;
   return (
     <div role={tone === 'info' ? 'status' : 'alert'} className={`flex gap-2 rounded-xl p-3 text-sm ${toneClasses} ${className}`}>

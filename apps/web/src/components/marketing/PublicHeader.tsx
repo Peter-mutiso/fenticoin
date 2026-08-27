@@ -36,7 +36,7 @@ export function PublicHeader() {
 
         <div className="hidden items-center gap-3 lg:flex">
           {status === 'authenticated' ? (
-            <Link href="/dashboard" className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-brand-600">
+            <Link href="/dashboard" className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-bold text-navy-950 transition hover:bg-brand-600">
               Go to Dashboard
             </Link>
           ) : (
@@ -44,7 +44,7 @@ export function PublicHeader() {
               <Link href="/login" className="text-sm font-semibold text-white/80 transition hover:text-white">
                 Log In
               </Link>
-              <Link href="/signup" className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-brand-600">
+              <Link href="/signup" className="rounded-full bg-brand-500 px-5 py-2.5 text-sm font-bold text-navy-950 transition hover:bg-brand-600">
                 Sign Up
               </Link>
             </>
@@ -78,7 +78,7 @@ export function PublicHeader() {
           </nav>
           <div className="mt-4 flex flex-col gap-2">
             {status === 'authenticated' ? (
-              <Link href="/dashboard" className="rounded-xl bg-brand-500 px-4 py-3 text-center text-sm font-bold text-white">
+              <Link href="/dashboard" className="rounded-xl bg-brand-500 px-4 py-3 text-center text-sm font-bold text-navy-950">
                 Go to Dashboard
               </Link>
             ) : (
@@ -86,7 +86,7 @@ export function PublicHeader() {
                 <Link href="/login" className="rounded-xl border border-white/15 px-4 py-3 text-center text-sm font-bold text-white">
                   Log In
                 </Link>
-                <Link href="/signup" className="rounded-xl bg-brand-500 px-4 py-3 text-center text-sm font-bold text-white">
+                <Link href="/signup" className="rounded-xl bg-brand-500 px-4 py-3 text-center text-sm font-bold text-navy-950">
                   Sign Up
                 </Link>
               </>

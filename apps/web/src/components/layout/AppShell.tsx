@@ -53,7 +53,7 @@ export function AppShell({ children, requireAuth = false }: { children: React.Re
         <button
           type="button"
           onClick={retry}
-          className="inline-flex items-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-brand-600"
+          className="inline-flex items-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-bold text-navy-950 transition hover:bg-brand-600"
         >
           <RefreshCw className="h-4 w-4" aria-hidden="true" />
           Retry

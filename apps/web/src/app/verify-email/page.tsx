@@ -63,7 +63,7 @@ function VerifyEmailContent() {
         </div>
         <h1 className="mt-5 text-2xl font-bold">We couldn&rsquo;t verify your email</h1>
         <p className="mt-2 text-sm leading-6 text-neutral-500">{state === 'missing-token' ? 'This link is missing its verification token.' : error}</p>
-        <Link href={continueHref} className="mt-7 inline-block rounded-full bg-brand-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-brand-600">
+        <Link href={continueHref} className="mt-7 inline-block rounded-full bg-brand-500 px-5 py-2.5 text-sm font-bold text-navy-950 transition hover:bg-brand-600">
           Continue to {status === 'authenticated' ? 'dashboard' : 'login'}
         </Link>
       </div>
@@ -72,12 +72,12 @@ function VerifyEmailContent() {
 
   return (
     <div className="text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
         <CheckCircle2 className="h-6 w-6" />
       </div>
       <h1 className="mt-5 text-2xl font-bold">Email verified</h1>
       <p className="mt-2 text-sm leading-6 text-neutral-500">Thanks — your email address has been confirmed.</p>
-      <Link href={continueHref} className="mt-7 inline-block rounded-full bg-brand-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-brand-600">
+      <Link href={continueHref} className="mt-7 inline-block rounded-full bg-brand-500 px-5 py-2.5 text-sm font-bold text-navy-950 transition hover:bg-brand-600">
         Continue to {status === 'authenticated' ? 'dashboard' : 'login'}
       </Link>
     </div>
@@ -93,7 +93,7 @@ export default function VerifyEmailPage() {
         </div>
         <div className="rounded-3xl border border-neutral-200 bg-white p-7 shadow-[0_24px_70px_rgba(15,23,42,.08)] sm:p-9">
           <div className="mb-2 flex justify-center">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
               <MailCheck className="h-5 w-5" />
             </div>
           </div>

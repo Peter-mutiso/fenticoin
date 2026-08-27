@@ -27,7 +27,7 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
             const isActive = Boolean(item.href) && pathname === item.href;
             const Icon = item.icon;
             const className = `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
-              isActive ? 'bg-brand-50 text-brand-600' : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
+              isActive ? 'bg-brand-50 text-brand-700' : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900'
             }`;
 
             return (

@@ -67,7 +67,7 @@ export default function LandingPage() {
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/signup"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-500 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-brand-500/20 transition hover:bg-brand-600"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-500 px-6 py-3.5 text-sm font-bold text-navy-950 shadow-lg shadow-brand-500/20 transition hover:bg-brand-600"
               >
                 Create free account <ArrowRight className="h-4 w-4" />
               </Link>
@@ -116,7 +116,7 @@ export default function LandingPage() {
       {/* Markets preview */}
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-600">Live markets</p>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-700">Live markets</p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-neutral-950">See what&rsquo;s trading right now</h2>
           <p className="mt-3 text-neutral-500">A snapshot of instruments currently available on FentiCoin.</p>
         </div>
@@ -131,13 +131,13 @@ export default function LandingPage() {
       <section className="bg-neutral-50 py-16">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-600">Platform</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-700">Platform</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight text-neutral-950">Everything you need in one account</h2>
           </div>
           <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {FEATURES.map((feature) => (
               <div key={feature.title} className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
                   <feature.icon className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <h3 className="mt-4 text-base font-bold text-neutral-950">{feature.title}</h3>
@@ -151,7 +151,7 @@ export default function LandingPage() {
       {/* How it works */}
       <section id="how-it-works" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-600">How it works</p>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-700">How it works</p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-neutral-950">Five steps to your first trade</h2>
         </div>
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
@@ -212,7 +212,7 @@ export default function LandingPage() {
           </div>
           <Link
             href="/signup"
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-brand-500 px-6 py-3.5 text-sm font-bold text-white transition hover:bg-brand-600"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-brand-500 px-6 py-3.5 text-sm font-bold text-navy-950 transition hover:bg-brand-600"
           >
             Create free account <ArrowRight className="h-4 w-4" />
           </Link>

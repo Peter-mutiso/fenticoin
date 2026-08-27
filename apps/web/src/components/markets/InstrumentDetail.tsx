@@ -48,7 +48,7 @@ export function InstrumentDetail({ instrumentId }: { instrumentId: string }) {
 
   return (
     <div>
-      <p className="text-sm font-semibold text-brand-600">{instrument.categoryKey}</p>
+      <p className="text-sm font-semibold text-brand-700">{instrument.categoryKey}</p>
       <h1 className="mt-1 text-3xl font-bold tracking-tight">{instrument.displaySymbol}</h1>
       <p className="mt-1 text-sm text-neutral-500">{instrument.name}</p>
 
@@ -64,7 +64,7 @@ export function InstrumentDetail({ instrumentId }: { instrumentId: string }) {
         {authStatus !== 'authenticated' ? (
           <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4">
             <p className="text-sm font-semibold text-brand-700">Log in to see odds and place a bet.</p>
-            <Link href="/login" className="shrink-0 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-600">
+            <Link href="/login" className="shrink-0 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-navy-950 transition hover:bg-brand-600">
               Log in
             </Link>
           </div>
@@ -158,7 +158,7 @@ function BettingOpportunityRow({
       </div>
       <Link
         href={`/dashboard?instrument=${instrumentId}&type=${betType}`}
-        className="shrink-0 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-600"
+        className="shrink-0 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-navy-950 transition hover:bg-brand-600"
       >
         Bet now
       </Link>

@@ -42,7 +42,7 @@ export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
 
 export const TRANSACTION_STATUS_STYLES: Record<TransactionStatus, StatusStyle> = {
   pending: { label: 'Pending', className: 'bg-neutral-100 text-neutral-700', icon: Clock3 },
-  posted: { label: 'Posted', className: 'bg-brand-50 text-brand-600', icon: CheckCircle2 },
-  failed: { label: 'Failed', className: 'bg-loss-50 text-loss-500', icon: XCircle },
+  posted: { label: 'Posted', className: 'bg-brand-50 text-brand-700', icon: CheckCircle2 },
+  failed: { label: 'Failed', className: 'bg-loss-50 text-loss-700', icon: XCircle },
   reversed: { label: 'Reversed', className: 'bg-amber-50 text-amber-700', icon: RotateCcw },
 };

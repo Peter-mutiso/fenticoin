@@ -45,7 +45,7 @@ export function BottomNav({ items }: { items: NavItem[] }) {
               aria-haspopup="dialog"
               aria-expanded={moreOpen}
               className={`flex w-full min-w-0 flex-col items-center gap-1 px-1 py-1 text-[10px] font-medium ${
-                overflowActive ? 'text-brand-600' : 'text-neutral-400'
+                overflowActive ? 'text-brand-700' : 'text-neutral-400'
               }`}
             >
               <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
@@ -71,7 +71,7 @@ function NavCell({ item, isActive }: { item: NavItem; isActive: boolean }) {
             href={item.href}
             aria-current={isActive ? 'page' : undefined}
             aria-label={item.label}
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 text-white shadow-lg shadow-brand-500/30 transition hover:bg-brand-600"
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 text-navy-950 shadow-lg shadow-brand-500/30 transition hover:bg-brand-600"
           >
             <Icon className="h-6 w-6" aria-hidden="true" />
           </Link>
@@ -89,7 +89,7 @@ function NavCell({ item, isActive }: { item: NavItem; isActive: boolean }) {
   }
 
   const className = `flex min-w-0 w-full flex-col items-center gap-1 px-1 py-1 text-[10px] font-medium ${
-    isActive ? 'text-brand-600' : 'text-neutral-400'
+    isActive ? 'text-brand-700' : 'text-neutral-400'
   }`;
 
   return (
@@ -134,7 +134,7 @@ function MoreSheet({ items, pathname, onClose }: { items: NavItem[]; pathname: s
                     onClick={onClose}
                     aria-current={isActive ? 'page' : undefined}
                     className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
-                      isActive ? 'bg-brand-50 text-brand-600' : 'text-neutral-700 hover:bg-neutral-50'
+                      isActive ? 'bg-brand-50 text-brand-700' : 'text-neutral-700 hover:bg-neutral-50'
                     }`}
                   >
                     <Icon className="h-5 w-5" aria-hidden="true" />

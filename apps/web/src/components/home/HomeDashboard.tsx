@@ -44,7 +44,7 @@ export function HomeDashboard() {
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4">
           <p className="text-sm font-semibold text-brand-700">Log in to see your balance and account activity.</p>
-          <Link href="/login" className="shrink-0 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-600">
+          <Link href="/login" className="shrink-0 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-navy-950 transition hover:bg-brand-600">
             Log in
           </Link>
         </div>
@@ -96,7 +96,7 @@ export function HomeDashboard() {
           <h2 id="dashboard-bots-heading" className="text-lg font-bold text-neutral-900">
             Bots
           </h2>
-          <Link href="/bots" className="text-sm font-semibold text-brand-600 hover:underline">
+          <Link href="/bots" className="text-sm font-semibold text-brand-700 hover:underline">
             View all &gt;
           </Link>
         </div>
@@ -138,7 +138,7 @@ export function HomeDashboard() {
           <h2 id="dashboard-activity-heading" className="text-lg font-bold text-neutral-900">
             Recent activity
           </h2>
-          <Link href="/bet-history" className="text-sm font-semibold text-brand-600 hover:underline">
+          <Link href="/bet-history" className="text-sm font-semibold text-brand-700 hover:underline">
             View all &gt;
           </Link>
         </div>
@@ -162,7 +162,7 @@ export function HomeDashboard() {
       <div className="flex justify-center pt-2">
         <Link
           href="/trade"
-          className="inline-flex items-center justify-center rounded-full bg-brand-500 px-6 py-3 text-sm font-bold text-white transition hover:bg-brand-600"
+          className="inline-flex items-center justify-center rounded-full bg-brand-500 px-6 py-3 text-sm font-bold text-navy-950 transition hover:bg-brand-600"
         >
           Start a trade
         </Link>

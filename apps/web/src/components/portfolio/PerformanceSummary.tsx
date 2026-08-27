@@ -42,7 +42,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'po
   return (
     <div>
       <dt className="text-xs text-neutral-500">{label}</dt>
-      <dd className={`mt-0.5 text-sm font-bold tabular-nums ${tone === 'positive' ? 'text-brand-600' : tone === 'negative' ? 'text-loss-500' : 'text-neutral-900'}`}>
+      <dd className={`mt-0.5 text-sm font-bold tabular-nums ${tone === 'positive' ? 'text-brand-700' : tone === 'negative' ? 'text-loss-700' : 'text-neutral-900'}`}>
         {value}
       </dd>
     </div>

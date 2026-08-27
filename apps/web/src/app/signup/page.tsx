@@ -84,7 +84,7 @@ export default function SignupPage() {
 
             <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,.08)] sm:p-9">
               <div className="mb-7">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-600"><ShieldCheck className="h-5 w-5" /></div>
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-700"><ShieldCheck className="h-5 w-5" /></div>
                 <h2 className="text-2xl font-bold tracking-tight text-neutral-950">Create your account</h2>
                 <p className="mt-2 text-sm leading-6 text-neutral-500">Set up your FentiCoin account in a few simple steps.</p>
               </div>
@@ -124,13 +124,13 @@ export default function SignupPage() {
 
                 {error && <Notice text={error} />}
 
-                <button type="submit" disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-3.5 font-bold text-white shadow-lg transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60">
+                <button type="submit" disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-3.5 font-bold text-navy-950 shadow-lg transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60">
                   {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <>Create account <ArrowRight className="h-4 w-4" /></>}
                 </button>
               </form>
 
               <p className="mt-6 text-center text-sm text-neutral-500">
-                Already have an account? <Link href="/login" className="font-bold text-brand-600 hover:text-brand-700">Log in</Link>
+                Already have an account? <Link href="/login" className="font-bold text-brand-700 hover:text-brand-600">Log in</Link>
               </p>
             </div>
           </div>

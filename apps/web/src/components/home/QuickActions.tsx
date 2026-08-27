@@ -6,7 +6,7 @@ export function QuickActions() {
     <div className="grid grid-cols-2 gap-3">
       <Link
         href="/account/deposit"
-        className="flex items-center justify-center gap-2 rounded-full bg-brand-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600"
+        className="flex items-center justify-center gap-2 rounded-full bg-brand-500 px-4 py-3 text-sm font-bold text-navy-950 transition hover:bg-brand-600"
       >
         <ArrowDownToLine className="h-4 w-4" aria-hidden="true" />
         Deposit

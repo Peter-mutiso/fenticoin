@@ -70,7 +70,7 @@ export function WithdrawalForm() {
     return (
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4">
         <p className="text-sm font-semibold text-brand-700">Log in to request a withdrawal.</p>
-        <Link href="/login" className="shrink-0 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-600">
+        <Link href="/login" className="shrink-0 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-navy-950 transition hover:bg-brand-600">
           Log in
         </Link>
       </div>
@@ -105,7 +105,7 @@ export function WithdrawalForm() {
         <button
           type="submit"
           disabled={!canSubmit}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-brand-500 px-4 py-3 font-bold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-400"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-brand-500 px-4 py-3 font-bold text-navy-950 transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-400"
         >
           <ArrowUpFromLine className="h-4 w-4" aria-hidden="true" />
           {submitting ? 'Submitting…' : 'Withdraw'}

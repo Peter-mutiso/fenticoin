@@ -28,14 +28,14 @@ import { StatusBadge, type StatusStyle } from '@/components/ui/StatusBadge';
 import { useToast } from '@/components/ui/Toast';
 
 export const BOT_STATUS_STYLES: Record<BotStatus, StatusStyle> = {
-  active: { label: 'Running', className: 'bg-brand-50 text-brand-600', icon: CheckCircle2 },
+  active: { label: 'Running', className: 'bg-brand-50 text-brand-700', icon: CheckCircle2 },
   inactive: { label: 'Paused', className: 'bg-neutral-100 text-neutral-700', icon: Pause },
   strategy_unconfigured: { label: 'Not configured', className: 'bg-amber-50 text-amber-700', icon: AlertCircle },
 };
 
 const LOG_LEVEL_CLASSES: Record<string, string> = {
-  success: 'text-brand-600',
-  error: 'text-loss-500',
+  success: 'text-brand-700',
+  error: 'text-loss-700',
   skipped: 'text-neutral-400',
   info: 'text-neutral-500',
 };
@@ -118,7 +118,7 @@ export function BotDetail({ botId }: { botId: string }) {
             type="button"
             disabled={isBusy}
             onClick={() => deactivateMutation.mutate()}
-            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-loss-50 px-4 py-3 text-sm font-bold text-loss-500 transition hover:bg-loss-50/80 disabled:opacity-50"
+            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-loss-50 px-4 py-3 text-sm font-bold text-loss-700 transition hover:bg-loss-50/80 disabled:opacity-50"
           >
             <Pause className="h-4 w-4" aria-hidden="true" /> Pause bot
           </button>
@@ -127,7 +127,7 @@ export function BotDetail({ botId }: { botId: string }) {
             type="button"
             disabled={isBusy || bot.status === 'strategy_unconfigured'}
             onClick={() => activateMutation.mutate()}
-            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-brand-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-400"
+            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-brand-500 px-4 py-3 text-sm font-bold text-navy-950 transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-400"
           >
             <Play className="h-4 w-4" aria-hidden="true" /> Start bot
           </button>
@@ -211,7 +211,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'po
   return (
     <div>
       <dt className="text-xs text-neutral-500">{label}</dt>
-      <dd className={`mt-0.5 text-sm font-bold ${tone === 'positive' ? 'text-brand-600' : tone === 'negative' ? 'text-loss-500' : 'text-neutral-900'}`}>
+      <dd className={`mt-0.5 text-sm font-bold ${tone === 'positive' ? 'text-brand-700' : tone === 'negative' ? 'text-loss-700' : 'text-neutral-900'}`}>
         {value}
       </dd>
     </div>

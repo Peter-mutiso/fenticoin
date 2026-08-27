@@ -55,7 +55,7 @@ export function PhoneVerificationSection() {
   return (
     <AccountSection title="Phone verification">
       {step === 'done' ? (
-        <p className="text-sm font-semibold text-brand-600">Phone verified for this session.</p>
+        <p className="text-sm font-semibold text-brand-700">Phone verified for this session.</p>
       ) : step === 'request' ? (
         <form onSubmit={handleRequest} className="space-y-3">
           <label className="block text-sm font-semibold">
@@ -72,7 +72,7 @@ export function PhoneVerificationSection() {
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-600 disabled:opacity-60"
+            className="rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-navy-950 transition hover:bg-brand-600 disabled:opacity-60"
           >
             {submitting ? 'Sending…' : 'Send code'}
           </button>
@@ -92,7 +92,7 @@ export function PhoneVerificationSection() {
           <button
             type="submit"
             disabled={submitting || code.trim().length !== 6}
-            className="rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-navy-950 transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? 'Verifying…' : 'Verify'}
           </button>

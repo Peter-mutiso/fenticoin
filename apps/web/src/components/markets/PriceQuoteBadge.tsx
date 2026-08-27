@@ -20,7 +20,7 @@ export function PriceQuoteBadge({
 
   if (compact) {
     return (
-      <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-bold tabular-nums ${price.isStale ? 'text-loss-500' : 'text-neutral-900'} ${className}`}>
+      <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-bold tabular-nums ${price.isStale ? 'text-loss-700' : 'text-neutral-900'} ${className}`}>
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${price.isStale ? 'bg-loss-500' : 'bg-brand-500'}`} aria-hidden="true" title={price.isStale ? 'Stale price' : 'Live price'} />
         {price.price} {currency}
       </span>
@@ -28,7 +28,7 @@ export function PriceQuoteBadge({
   }
 
   return (
-    <div className={`rounded-xl p-3 ${price.isStale ? 'bg-loss-50 text-loss-500' : 'bg-neutral-50'} ${className}`}>
+    <div className={`rounded-xl p-3 ${price.isStale ? 'bg-loss-50 text-loss-700' : 'bg-neutral-50'} ${className}`}>
       <div className="flex justify-between">
         <span className="text-xs font-semibold text-neutral-500">Live price</span>
         <span className="text-xs">{price.isStale ? 'STALE' : 'LIVE'}</span>

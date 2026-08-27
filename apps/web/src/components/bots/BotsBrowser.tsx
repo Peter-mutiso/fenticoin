@@ -13,9 +13,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Notice } from '@/components/ui/Notice';
 
 const RISK_STYLES: Record<string, string> = {
-  low: 'bg-brand-50 text-brand-600',
+  low: 'bg-brand-50 text-brand-700',
   medium: 'bg-amber-50 text-amber-700',
-  high: 'bg-loss-50 text-loss-500',
+  high: 'bg-loss-50 text-loss-700',
 };
 
 const CATEGORY_LABELS: Record<StrategyCategory, string> = {
@@ -107,7 +107,7 @@ export function BotsBrowser() {
             type="button"
             onClick={() => setCategory(cat)}
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition ${
-              category === cat ? 'bg-brand-500 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+              category === cat ? 'bg-brand-500 text-navy-950' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
             }`}
           >
             {CATEGORY_LABELS[cat]}
@@ -161,7 +161,7 @@ function PresetCard({ preset, strategyName }: { preset: BotPreset; strategyName?
       {/* No performance metric here: a preset is a configuration, not a bot anyone has run yet — showing a number would be fabricated. */}
       <Link
         href={`/bots/new?strategy=${preset.strategyKey}&preset=${preset.key}`}
-        className="mt-3 flex items-center justify-center rounded-full bg-brand-500 py-2 text-center text-sm font-bold text-white transition hover:bg-brand-600"
+        className="mt-3 flex items-center justify-center rounded-full bg-brand-500 py-2 text-center text-sm font-bold text-navy-950 transition hover:bg-brand-600"
       >
         Use bot
       </Link>
@@ -183,7 +183,7 @@ function BotCard({ bot, entry }: { bot: Bot; entry?: StrategyCatalogEntry }) {
             Every {formatExecutionInterval(bot.executionIntervalSeconds)} · {entry?.riskLevel} risk
           </p>
         </div>
-        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${bot.status === 'active' ? 'bg-brand-50 text-brand-600' : 'bg-neutral-100 text-neutral-500'}`}>
+        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${bot.status === 'active' ? 'bg-brand-50 text-brand-700' : 'bg-neutral-100 text-neutral-500'}`}>
           {bot.status === 'active' ? 'Running' : bot.status === 'inactive' ? 'Paused' : 'Not configured'}
         </span>
       </div>
@@ -198,7 +198,7 @@ function BotCard({ bot, entry }: { bot: Bot; entry?: StrategyCatalogEntry }) {
         >
           Configure
         </Link>
-        <Link href={`/bots/${bot.id}`} className="flex-1 rounded-full bg-brand-500 py-2 text-center text-sm font-bold text-white transition hover:bg-brand-600">
+        <Link href={`/bots/${bot.id}`} className="flex-1 rounded-full bg-brand-500 py-2 text-center text-sm font-bold text-navy-950 transition hover:bg-brand-600">
           View bot
         </Link>
       </div>

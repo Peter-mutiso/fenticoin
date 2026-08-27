@@ -52,7 +52,7 @@ export function MarketsBrowser() {
       ) : (
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4">
           <p className="text-sm font-semibold text-brand-700">Log in to see your balance.</p>
-          <Link href="/login" className="shrink-0 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-600">
+          <Link href="/login" className="shrink-0 rounded-full bg-brand-500 px-4 py-2 text-sm font-bold text-navy-950 transition hover:bg-brand-600">
             Log in
           </Link>
         </div>

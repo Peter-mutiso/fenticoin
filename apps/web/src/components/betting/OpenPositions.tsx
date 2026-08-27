@@ -42,7 +42,7 @@ export function OpenPositions({ bets, instruments, emptyHint }: { bets: Bet[]; i
     <section aria-labelledby="open-positions-heading">
       <h2 id="open-positions-heading" className="flex items-center gap-2 text-lg font-bold text-neutral-900">
         Open positions
-        {open.length > 0 && <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-bold text-brand-600">{open.length}</span>}
+        {open.length > 0 && <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-bold text-brand-700">{open.length}</span>}
       </h2>
       {open.length === 0 ? (
         <div className="mt-3">

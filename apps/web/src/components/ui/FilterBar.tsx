@@ -19,7 +19,7 @@ export function FilterBar({
         type="button"
         onClick={() => onChange(null)}
         className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-          value === null ? 'bg-brand-500 text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+          value === null ? 'bg-brand-500 text-navy-950' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
         }`}
       >
         All
@@ -30,7 +30,7 @@ export function FilterBar({
           type="button"
           onClick={() => onChange(option.value)}
           className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-            value === option.value ? 'bg-brand-500 text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+            value === option.value ? 'bg-brand-500 text-navy-950' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
           }`}
         >
           {option.label}
