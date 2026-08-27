@@ -46,8 +46,19 @@ WORKDIR /repo
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 nestjs
 
-# Production dependencies + pnpm workspace links
+# Production dependencies + pnpm workspace links.
+# Both copies are needed: --shamefully-hoist places (most) resolved
+# packages in the workspace-root node_modules, but @fenticoin/api's own
+# node_modules (pnpm creates this for every workspace project regardless
+# of hoisting) is the direct, unambiguous resolution path for packages
+# @fenticoin/api itself depends on directly — e.g. reflect-metadata,
+# imported at the top of src/main.ts and required unconditionally by
+# Nest's decorator metadata reflection at boot. Relying on hoisting alone
+# has previously caused "Cannot find module 'reflect-metadata'" at
+# runtime; do not remove either COPY without re-verifying module
+# resolution from /repo/apps/api in a production-like environment.
 COPY --from=prod-deps /repo/node_modules ./node_modules
+COPY --from=prod-deps /repo/apps/api/node_modules ./apps/api/node_modules
 
 # Workspace package metadata + compiled output
 COPY --from=build /repo/packages/config/package.json ./packages/config/package.json
