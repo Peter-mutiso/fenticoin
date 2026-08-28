@@ -65,10 +65,15 @@ function normalizeApiUrl(baseUrl: string, path: string): string {
   return `${normalizedBaseUrl}/${normalizedPath}`;
 }
 
+// 30s, not a more typical 10-12s: the production API can cold-start (e.g.
+// a sleeping Render free-tier instance) and take 20s+ to answer its very
+// first request after a period of inactivity — a live-verified case where
+// a too-short timeout aborts a request that would otherwise have
+// succeeded, surfacing as a spurious NetworkError below.
 async function rawFetch(
   path: string,
   init?: RequestInit,
-  timeoutMs = 12_000,
+  timeoutMs = 30_000,
 ): Promise<Response> {
   const { NEXT_PUBLIC_API_URL } = getPublicEnv();
 

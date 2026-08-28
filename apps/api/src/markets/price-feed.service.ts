@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { and, asc, desc, eq, gte, lt } from 'drizzle-orm';
 import { filter, Observable, Subject } from 'rxjs';
 
@@ -26,7 +26,7 @@ interface CacheEntry {
  * `getLatestPrice`, which is the one place staleness is enforced.
  */
 @Injectable()
-export class PriceFeedService {
+export class PriceFeedService implements OnModuleInit {
   private readonly logger = new Logger(PriceFeedService.name);
   private readonly cache = new Map<string, CacheEntry>();
   private readonly ticks$ = new Subject<PriceQuote>();
@@ -36,6 +36,25 @@ export class PriceFeedService {
     private readonly instrumentService: InstrumentService,
     @Inject(MARKET_DATA_PROVIDER) private readonly provider: MarketDataProvider,
   ) {}
+
+  /**
+   * Logs the selected provider once at boot — the single most useful line
+   * for diagnosing "prices never refresh" incidents, since an unconfigured
+   * provider fails every scheduled refresh silently (by design, to never
+   * fabricate a price) and otherwise leaves no trace until someone notices
+   * the staleness hours later. See `MarketDataProvidersModule` for the
+   * selection logic this is reporting on.
+   */
+  onModuleInit(): void {
+    this.logger.log(
+      `Market data provider selected: ${this.provider.name} (configured=${this.provider.isConfigured()})`,
+    );
+    if (!this.provider.isConfigured()) {
+      this.logger.warn(
+        `Market data provider "${this.provider.name}" is not configured — scheduled price refreshes will fail and prices will go stale. Set MARKET_DATA_PROVIDER (and any provider-specific credentials) to fix this.`,
+      );
+    }
+  }
 
   /**
    * Records a new tick. This is the only place `price_ticks` is ever
@@ -173,25 +192,41 @@ export class PriceFeedService {
         { providerSymbol: instrument.providerSymbol, quoteCurrency: instrument.quoteCurrency },
       ]);
       if (!quote) {
-        this.logger.warn(`${this.provider.name} returned no quote for ${instrument.displaySymbol}`);
+        this.logger.warn(
+          `market-data refresh: no quote returned instrument=${instrument.displaySymbol} provider=${this.provider.name}`,
+        );
         return undefined;
       }
-      return await this.ingestTick(instrument, {
+      const ingested = await this.ingestTick(instrument, {
         priceDecimal: quote.priceDecimal,
         source: this.provider.name,
         observedAt: quote.observedAt,
       });
+      // debug, not log/info: this fires once per active instrument every
+      // refresh-cycle tick (see `PriceRefreshScheduler`) — routine success
+      // would otherwise drown out the operationally-relevant summary line
+      // `refreshAllActive` logs once per cycle. Set LOG_LEVEL=debug to see
+      // per-instrument detail.
+      this.logger.debug(
+        `market-data refresh: instrument=${instrument.displaySymbol} provider=${this.provider.name} price=${quote.priceDecimal}`,
+      );
+      return ingested;
     } catch (error) {
       this.logger.error(
-        `Failed to refresh ${instrument.displaySymbol} from ${this.provider.name}: ${String(error)}`,
+        `market-data refresh failed instrument=${instrument.displaySymbol} provider=${this.provider.name} error=${String(error)}`,
       );
       return undefined;
     }
   }
 
   async refreshAllActive(): Promise<void> {
+    const started = Date.now();
     const active = (await this.instrumentService.list()).filter((i) => i.status === 'active');
-    await Promise.all(active.map((instrument) => this.refreshFromProvider(instrument)));
+    const results = await Promise.all(active.map((instrument) => this.refreshFromProvider(instrument)));
+    const succeeded = results.filter((result) => result !== undefined).length;
+    this.logger.log(
+      `market-data refresh completed provider=${this.provider.name} succeeded=${succeeded} failed=${active.length - succeeded} durationMs=${Date.now() - started}`,
+    );
   }
 
   /** Live tick stream for one instrument — see `MarketsController`'s SSE endpoint. */

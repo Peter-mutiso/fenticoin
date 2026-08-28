@@ -174,5 +174,54 @@ describe('PriceFeedService', () => {
       expect(provider.getQuotes).toHaveBeenCalledTimes(1);
       expect((provider.getQuotes as jest.Mock).mock.calls[0][0]).toEqual([{ providerSymbol: 'bitcoin', quoteCurrency: 'USD' }]);
     });
+
+    it('isolates per-instrument failures — one bad instrument does not block the others from updating', async () => {
+      const insertChain = chainable([{ id: 'tick-1', price: 100n, source: 'TestProvider', observedAt: NOW, receivedAt: NOW }]);
+      const insert = jest.fn().mockReturnValue(insertChain);
+      const { service, instrumentService, provider } = makeHarness({ db: { insert } });
+      (instrumentService.list as jest.Mock).mockResolvedValue([
+        instrument({ id: 'a', providerSymbol: 'bitcoin', status: 'active' }),
+        instrument({ id: 'b', providerSymbol: 'ethereum', status: 'active' }),
+        instrument({ id: 'c', providerSymbol: 'solana', status: 'active' }),
+      ]);
+      (provider.getQuotes as jest.Mock).mockImplementation(
+        async ([{ providerSymbol }]: [{ providerSymbol: string }]) => {
+          if (providerSymbol === 'ethereum') throw new Error('provider unavailable for ethereum');
+          return [{ providerSymbol, quoteCurrency: 'USD', priceDecimal: '1.00', observedAt: NOW }];
+        },
+      );
+
+      await service.refreshAllActive();
+
+      // A and C (bitcoin, solana) each independently reached the insert
+      // step — B's failure was isolated to its own provider call and
+      // never prevented A/C's from running.
+      const insertedInstrumentIds = insertChain.values.mock.calls.map(
+        ([values]: [{ instrumentId: string }]) => values.instrumentId,
+      );
+      expect(insertedInstrumentIds.sort()).toEqual(['a', 'c']);
+    });
+  });
+
+  describe('onModuleInit', () => {
+    it('logs the selected provider name and configured status', () => {
+      const { service, provider } = makeHarness();
+      const logSpy = jest.spyOn((service as unknown as { logger: { log: (msg: string) => void } }).logger, 'log');
+
+      service.onModuleInit();
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining(provider.name));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('configured=true'));
+    });
+
+    it('warns loudly when the selected provider is not configured', () => {
+      const { service, provider } = makeHarness();
+      (provider as { isConfigured: () => boolean }).isConfigured = () => false;
+      const warnSpy = jest.spyOn((service as unknown as { logger: { warn: (msg: string) => void } }).logger, 'warn');
+
+      service.onModuleInit();
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not configured'));
+    });
   });
 });

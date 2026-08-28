@@ -63,7 +63,7 @@ describe('CoinGeckoMarketDataProvider', () => {
     await expect(provider.getQuotes([{ providerSymbol: 'bitcoin', quoteCurrency: 'USD' }])).rejects.toThrow('429');
   });
 
-  it('sends the pro API key header when one is configured', async () => {
+  it('sends the Demo-tier API key header when one is configured', async () => {
     const fetchSpy = jest.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
     global.fetch = fetchSpy as unknown as typeof fetch;
 
@@ -71,6 +71,6 @@ describe('CoinGeckoMarketDataProvider', () => {
     await provider.getQuotes([{ providerSymbol: 'bitcoin', quoteCurrency: 'USD' }]);
 
     const [, init] = fetchSpy.mock.calls[0] as [URL, { headers: Record<string, string> }];
-    expect(init.headers['x-cg-pro-api-key']).toBe('secret-key');
+    expect(init.headers['x-cg-demo-api-key']).toBe('secret-key');
   });
 });

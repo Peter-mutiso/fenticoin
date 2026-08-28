@@ -15,12 +15,14 @@ interface CoinGeckoSimplePriceResponse {
  * volumes, so this is usable out of the box for crypto instruments
  * whose `providerSymbol` is set to the corresponding CoinGecko coin id
  * (e.g. "bitcoin", "ethereum" — see `database/seed/seed-instruments.ts`).
- * `COINGECKO_API_KEY` is optional and, if set, is sent as a Pro-tier
- * header for higher rate limits.
  *
- * Written against CoinGecko's documented response shape but not
- * exercised against the live network in this environment — verify
- * against a real request before relying on it in production.
+ * `COINGECKO_API_KEY` is optional and, if set, is sent under the free
+ * **Demo**-tier header (`x-cg-demo-api-key`) for a higher rate limit on
+ * this same `api.coingecko.com` root — not the paid Pro tier, which is a
+ * different header *and* a different base URL (`pro-api.coingecko.com`)
+ * this class does not target. Live-verified against the real network: the
+ * anonymous rate limit is low enough that refreshing 4 instruments every
+ * 10 seconds can 429 without a Demo key configured.
  */
 @Injectable()
 export class CoinGeckoMarketDataProvider implements MarketDataProvider {
@@ -45,7 +47,7 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
 
     const headers: Record<string, string> = {};
     if (this.config.coinGeckoApiKey) {
-      headers['x-cg-pro-api-key'] = this.config.coinGeckoApiKey;
+      headers['x-cg-demo-api-key'] = this.config.coinGeckoApiKey;
     }
 
     const response = await fetch(url, { headers });
