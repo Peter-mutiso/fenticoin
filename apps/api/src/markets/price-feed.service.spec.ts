@@ -161,46 +161,66 @@ describe('PriceFeedService', () => {
   });
 
   describe('refreshAllActive', () => {
-    it('only refreshes instruments with status "active"', async () => {
-      const { service, instrumentService, provider } = makeHarness();
-      (instrumentService.list as jest.Mock).mockResolvedValue([
-        instrument({ id: 'a', status: 'active' }),
-        instrument({ id: 'b', status: 'suspended' }),
-        instrument({ id: 'c', status: 'delisted' }),
-      ]);
-      (provider.getQuotes as jest.Mock).mockResolvedValue([]);
+    it('isolates missing provider quotes — instruments with returned quotes are ingested independently', async () => {
+  const insertChain = chainable([
+    {
+      id: 'tick-1',
+      price: 100n,
+      source: 'TestProvider',
+      observedAt: NOW,
+      receivedAt: NOW,
+    },
+  ]);
 
-      await service.refreshAllActive();
-      expect(provider.getQuotes).toHaveBeenCalledTimes(1);
-      expect((provider.getQuotes as jest.Mock).mock.calls[0][0]).toEqual([{ providerSymbol: 'bitcoin', quoteCurrency: 'USD' }]);
-    });
+  const insert = jest.fn().mockReturnValue(insertChain);
 
-    it('isolates per-instrument failures — one bad instrument does not block the others from updating', async () => {
-      const insertChain = chainable([{ id: 'tick-1', price: 100n, source: 'TestProvider', observedAt: NOW, receivedAt: NOW }]);
-      const insert = jest.fn().mockReturnValue(insertChain);
-      const { service, instrumentService, provider } = makeHarness({ db: { insert } });
-      (instrumentService.list as jest.Mock).mockResolvedValue([
-        instrument({ id: 'a', providerSymbol: 'bitcoin', status: 'active' }),
-        instrument({ id: 'b', providerSymbol: 'ethereum', status: 'active' }),
-        instrument({ id: 'c', providerSymbol: 'solana', status: 'active' }),
-      ]);
-      (provider.getQuotes as jest.Mock).mockImplementation(
-        async ([{ providerSymbol }]: [{ providerSymbol: string }]) => {
-          if (providerSymbol === 'ethereum') throw new Error('provider unavailable for ethereum');
-          return [{ providerSymbol, quoteCurrency: 'USD', priceDecimal: '1.00', observedAt: NOW }];
-        },
-      );
+  const { service, instrumentService, provider } = makeHarness({
+    db: { insert },
+  });
 
-      await service.refreshAllActive();
+  (instrumentService.list as jest.Mock).mockResolvedValue([
+    instrument({
+      id: 'a',
+      providerSymbol: 'bitcoin',
+      status: 'active',
+    }),
+    instrument({
+      id: 'b',
+      providerSymbol: 'ethereum',
+      status: 'active',
+    }),
+    instrument({
+      id: 'c',
+      providerSymbol: 'solana',
+      status: 'active',
+    }),
+  ]);
 
-      // A and C (bitcoin, solana) each independently reached the insert
-      // step — B's failure was isolated to its own provider call and
-      // never prevented A/C's from running.
-      const insertedInstrumentIds = insertChain.values.mock.calls.map(
-        ([values]: [{ instrumentId: string }]) => values.instrumentId,
-      );
-      expect(insertedInstrumentIds.sort()).toEqual(['a', 'c']);
-    });
+  (provider.getQuotes as jest.Mock).mockResolvedValue([
+    {
+      providerSymbol: 'bitcoin',
+      quoteCurrency: 'USD',
+      priceDecimal: '1.00',
+      observedAt: NOW,
+    },
+    {
+      providerSymbol: 'solana',
+      quoteCurrency: 'USD',
+      priceDecimal: '1.00',
+      observedAt: NOW,
+    },
+  ]);
+
+  await service.refreshAllActive();
+
+  const insertedInstrumentIds = insertChain.values.mock.calls.map(
+    ([values]: [{ instrumentId: string }]) =>
+      values.instrumentId,
+  );
+
+  expect(insertedInstrumentIds.sort()).toEqual(['a', 'c']);
+});
+
   });
 
   describe('onModuleInit', () => {

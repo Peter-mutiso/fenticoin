@@ -18,9 +18,14 @@ export class PriceRefreshScheduler {
    * The refresh is guarded so that a slow provider request cannot overlap
    * with the next scheduled cycle.
    *
-   * We intentionally keep the trusted stale-price validation inside
-   * PriceFeedService. If the provider fails, the system must NOT fabricate
-   * or reuse an old price indefinitely.
+   * PriceFeedService remains responsible for:
+   * - provider communication
+   * - stale-price validation
+   * - rejecting invalid provider data
+   * - preventing fabricated prices
+   *
+   * If the provider is unavailable or rate-limited, we do not manufacture
+   * a replacement price.
    */
   @Cron(CronExpression.EVERY_10_SECONDS)
   async refresh(): Promise<void> {
