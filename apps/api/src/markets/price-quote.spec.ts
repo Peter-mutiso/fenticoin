@@ -14,8 +14,9 @@ describe('toPriceQuote', () => {
 
     const quote = toPriceQuote(tick, { quoteCurrency: 'USD', pricePrecision: 2 }, false);
 
-    expect(quote.price.toDecimalString()).toBe('112503.27');
-    expect(quote.price.currency.code).toBe('USD');
+    expect(quote.price).toBe('112503.27');
+expect(quote.quoteCurrency).toBe('USD');
+expect(quote.pricePrecision).toBe(2);
     expect(quote.isStale).toBe(false);
     expect(quote.source).toBe('test');
   });

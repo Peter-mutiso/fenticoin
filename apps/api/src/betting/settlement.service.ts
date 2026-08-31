@@ -453,7 +453,7 @@ export class SettlementService {
       entryPrice: bet.entryPrice,
       settlementPrice: decimalStringToScaledBigInt(
   settlementQuote.price,
-  // We need the instrument precision here.
+  settlementQuote.pricePrecision,
 ),
     });
 
@@ -575,7 +575,12 @@ export class SettlementService {
       openingPrice: params.bet.entryPrice,
       openingPriceSource: params.bet.entryPriceSource ?? 'unknown',
       openingPriceObservedAt: params.bet.entryPriceObservedAt,
-      closingPrice: params.closing?.price.toMinorUnits(),
+      closingPrice: params.closing
+  ? decimalStringToScaledBigInt(
+      params.closing.price,
+      params.closing.pricePrecision,
+    )
+  : undefined,
       closingPriceSource: params.closing?.source,
       closingPriceObservedAt: params.closing?.observedAt,
       stakeAmount: params.bet.stakeAmount,

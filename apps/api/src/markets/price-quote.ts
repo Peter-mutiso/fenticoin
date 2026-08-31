@@ -16,17 +16,9 @@ import type { Instrument, PriceTick } from '../database/schema';
  */
 export interface PriceQuote {
   instrumentId: string;
-
-  /**
-   * Exact decimal representation of the price.
-   *
-   * Example:
-   *   "109234.52000000"
-   *
-   * Never use a JavaScript number for financial/market prices.
-   */
   price: string;
-
+  quoteCurrency: string;
+  pricePrecision: number;
   source: string;
   observedAt: Date;
   receivedAt: Date;

@@ -132,9 +132,7 @@ describe('realtime-events — envelope determinism (duplicate-event handling)', 
       }),
     );
 
-    expect(
-      completed.id,
-    ).toBe(
+    expect(completed.id).toBe(
       buildDepositEvent(
         deposit({
           status: 'completed',
@@ -281,9 +279,7 @@ describe('realtime-events — envelope determinism (duplicate-event handling)', 
 
     const notification = buildNotificationEvent(source);
 
-    expect(notification.id).toBe(
-      `notification:${source.id}`,
-    );
+    expect(notification.id).toBe(`notification:${source.id}`);
     expect(notification.type).toBe('notification.new');
     expect(notification.userId).toBe(source.userId);
   });
@@ -317,12 +313,7 @@ describe('realtime-events — terminal-status predicates mirror the client exact
     expect(isTerminalWithdrawalStatus('rejected')).toBe(true);
     expect(isTerminalWithdrawalStatus('reversed')).toBe(true);
 
-    expect(
-      isTerminalWithdrawalStatus('pending_review'),
-    ).toBe(false);
-
-    expect(
-      isTerminalWithdrawalStatus('submitted'),
-    ).toBe(false);
+    expect(isTerminalWithdrawalStatus('pending_review')).toBe(false);
+    expect(isTerminalWithdrawalStatus('submitted')).toBe(false);
   });
 });
