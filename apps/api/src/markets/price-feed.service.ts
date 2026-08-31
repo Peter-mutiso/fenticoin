@@ -1,3 +1,4 @@
+
 import {
   BadRequestException,
   Inject,
@@ -5,7 +6,7 @@ import {
   Logger,
   type OnModuleInit,
 } from '@nestjs/common';
-import { and, asc, desc, eq, gte, lt } from 'drizzle-orm';
+import { and, desc, eq, lte } from 'drizzle-orm';
 import { filter, Observable, Subject } from 'rxjs';
 
 import { DRIZZLE_CLIENT } from '../database/database.constants';
@@ -16,9 +17,15 @@ import {
   priceTicks,
 } from '../database/schema';
 import { decimalStringToScaledBigInt } from './decimal';
-import { NoPriceAvailableError, StalePriceError } from './errors';
+import {
+  NoPriceAvailableError,
+  StalePriceError,
+} from './errors';
 import { InstrumentService } from './instrument.service';
-import { toPriceQuote, type PriceQuote } from './price-quote';
+import {
+  toPriceQuote,
+  type PriceQuote,
+} from './price-quote';
 import {
   MARKET_DATA_PROVIDER,
   type MarketDataProvider,
@@ -39,7 +46,7 @@ const PROVIDER_MIN_REFRESH_INTERVAL_MS = 15_000;
  * amount of time.
  *
  * Existing database ticks remain untouched and naturally age out through
- * the normal stale-price validation.
+ * normal stale-price validation.
  */
 const PROVIDER_RATE_LIMIT_COOLDOWN_MS = 60_000;
 
@@ -66,12 +73,12 @@ export class PriceFeedService implements OnModuleInit {
   private readonly ticks$ = new Subject<PriceQuote>();
 
   /**
-   * Prevent overlapping provider refresh operations.
+   * Prevent overlapping provider refresh operations in this process.
    */
   private providerRefreshing = false;
 
   /**
-   * Timestamp of the last provider request attempt.
+   * Timestamp of the last actual provider request attempt.
    */
   private lastProviderRefreshAt = 0;
 
@@ -102,17 +109,19 @@ export class PriceFeedService implements OnModuleInit {
 
     if (!configured) {
       this.logger.warn(
-        `Market data provider "${this.provider.name}" is not configured — scheduled price refreshes will fail and prices will eventually become stale.`,
+        `Market data provider "${this.provider.name}" is not configured — ` +
+          `scheduled price refreshes will fail and prices will eventually become stale.`,
       );
     }
   }
 
   /**
-   * Append a new price tick.
+   * Append a new trusted price tick.
    *
    * This is the only method that writes to price_ticks.
    *
-   * No fabricated prices are ever written.
+   * No fabricated, fallback, zero, negative, NaN, or undefined prices
+   * are ever written.
    */
   async ingestTick(
     instrument: Instrument,
@@ -122,13 +131,48 @@ export class PriceFeedService implements OnModuleInit {
       observedAt: Date;
     },
   ): Promise<PriceQuote> {
+    if (!quote.priceDecimal) {
+      throw new BadRequestException(
+        `Price is missing for instrument ${instrument.displaySymbol}`,
+      );
+    }
+
+    if (!quote.source) {
+      throw new BadRequestException(
+        `Price source is missing for instrument ${instrument.displaySymbol}`,
+      );
+    }
+
+    if (!(quote.observedAt instanceof Date)) {
+      throw new BadRequestException(
+        `Price observedAt is invalid for instrument ${instrument.displaySymbol}`,
+      );
+    }
+
+    if (Number.isNaN(quote.observedAt.getTime())) {
+      throw new BadRequestException(
+        `Price observedAt is invalid for instrument ${instrument.displaySymbol}`,
+      );
+    }
+
+    const normalizedPrice =
+      String(quote.priceDecimal).trim();
+
+    if (!normalizedPrice) {
+      throw new BadRequestException(
+        `Price is empty for instrument ${instrument.displaySymbol}`,
+      );
+    }
+
     const scaled = decimalStringToScaledBigInt(
-      quote.priceDecimal,
+      normalizedPrice,
       instrument.pricePrecision,
     );
 
     if (scaled <= 0n) {
-      throw new BadRequestException('Price must be positive');
+      throw new BadRequestException(
+        `Price must be positive for instrument ${instrument.displaySymbol}`,
+      );
     }
 
     const [tick] = await this.db
@@ -145,6 +189,9 @@ export class PriceFeedService implements OnModuleInit {
       throw new Error('Failed to insert price tick');
     }
 
+    /**
+     * Update the latest-price cache immediately.
+     */
     this.cache.set(instrument.id, {
       tick,
       instrument,
@@ -155,6 +202,18 @@ export class PriceFeedService implements OnModuleInit {
       tick,
       instrument,
       false,
+    );
+
+    /**
+     * Defensive validation of the domain quote before exposing it
+     * through the live stream.
+     *
+     * This prevents an invalid quote from propagating to SSE/WebSocket
+     * consumers and ultimately producing "price: undefined" in the UI.
+     */
+    this.assertValidPriceQuote(
+      priceQuote,
+      instrument,
     );
 
     this.ticks$.next(priceQuote);
@@ -168,7 +227,8 @@ export class PriceFeedService implements OnModuleInit {
    * A price is valid only if:
    *
    * 1. A tick exists.
-   * 2. The tick is not older than maxPriceAgeSeconds.
+   * 2. The tick has a valid positive price.
+   * 3. The tick is not older than maxPriceAgeSeconds.
    *
    * Never fabricate a price and never silently use an indefinitely stale
    * price.
@@ -177,21 +237,32 @@ export class PriceFeedService implements OnModuleInit {
     instrumentId: string,
   ): Promise<PriceQuote> {
     const instrument =
-      await this.instrumentService.getById(instrumentId);
+      await this.instrumentService.getById(
+        instrumentId,
+      );
 
     const cached = this.cache.get(instrumentId);
 
     let tick = cached?.tick;
 
-    if (
-      !tick ||
-      Date.now() - cached!.cachedAt > CACHE_TTL_MS
-    ) {
+    const cacheExpired =
+      !cached ||
+      Date.now() - cached.cachedAt >
+        CACHE_TTL_MS;
+
+    if (cacheExpired) {
       const [dbTick] = await this.db
         .select()
         .from(priceTicks)
-        .where(eq(priceTicks.instrumentId, instrumentId))
-        .orderBy(desc(priceTicks.observedAt))
+        .where(
+          eq(
+            priceTicks.instrumentId,
+            instrumentId,
+          ),
+        )
+        .orderBy(
+          desc(priceTicks.observedAt),
+        )
         .limit(1);
 
       tick = dbTick;
@@ -206,11 +277,17 @@ export class PriceFeedService implements OnModuleInit {
     }
 
     if (!tick) {
-      throw new NoPriceAvailableError(instrumentId);
+      throw new NoPriceAvailableError(
+        instrumentId,
+      );
     }
 
+    this.assertValidTick(tick, instrument);
+
     const ageSeconds =
-      (Date.now() - tick.observedAt.getTime()) / 1000;
+      (Date.now() -
+        tick.observedAt.getTime()) /
+      1000;
 
     if (
       ageSeconds >
@@ -218,38 +295,70 @@ export class PriceFeedService implements OnModuleInit {
     ) {
       throw new StalePriceError({
         instrumentId,
-        ageSeconds: Math.round(ageSeconds),
+        ageSeconds: Math.round(
+          ageSeconds,
+        ),
         maxAgeSeconds:
           instrument.maxPriceAgeSeconds,
       });
     }
 
-    return toPriceQuote(
+    const priceQuote = toPriceQuote(
       tick,
       instrument,
       false,
     );
+
+    this.assertValidPriceQuote(
+      priceQuote,
+      instrument,
+    );
+
+    return priceQuote;
   }
 
   /**
    * Return the trusted price associated with a specific settlement time.
    *
-   * Preference:
+   * Settlement policy:
    *
-   * 1. Earliest tick at or after the settlement timestamp.
-   * 2. Latest tick before the settlement timestamp.
+   * - Only use a tick that existed at or before the settlement timestamp.
+   * - Select the latest tick at or before that timestamp.
+   * - Never use a future tick.
+   * - The selected tick must be within maxPriceAgeSeconds of settlement.
    *
-   * Staleness is measured relative to the settlement timestamp rather than
-   * the current wall clock.
+   * This prevents future-price leakage during settlement.
    */
   async getPriceForSettlement(
     instrumentId: string,
     at: Date,
   ): Promise<PriceQuote> {
-    const instrument =
-      await this.instrumentService.getById(instrumentId);
+    if (!(at instanceof Date)) {
+      throw new BadRequestException(
+        'Settlement timestamp is invalid',
+      );
+    }
 
-    const [tickAtOrAfter] = await this.db
+    if (Number.isNaN(at.getTime())) {
+      throw new BadRequestException(
+        'Settlement timestamp is invalid',
+      );
+    }
+
+    const instrument =
+      await this.instrumentService.getById(
+        instrumentId,
+      );
+
+    /**
+     * IMPORTANT:
+     *
+     * We deliberately select only prices that were observed at or before
+     * the settlement timestamp.
+     *
+     * A future price must never influence settlement.
+     */
+    const [tick] = await this.db
       .select()
       .from(priceTicks)
       .where(
@@ -258,42 +367,48 @@ export class PriceFeedService implements OnModuleInit {
             priceTicks.instrumentId,
             instrumentId,
           ),
-          gte(priceTicks.observedAt, at),
+          lte(
+            priceTicks.observedAt,
+            at,
+          ),
         ),
       )
-      .orderBy(asc(priceTicks.observedAt))
+      .orderBy(
+        desc(priceTicks.observedAt),
+      )
       .limit(1);
 
-    let tick = tickAtOrAfter;
-
     if (!tick) {
-      const [tickBefore] = await this.db
-        .select()
-        .from(priceTicks)
-        .where(
-          and(
-            eq(
-              priceTicks.instrumentId,
-              instrumentId,
-            ),
-            lt(priceTicks.observedAt, at),
-          ),
-        )
-        .orderBy(desc(priceTicks.observedAt))
-        .limit(1);
-
-      tick = tickBefore;
+      throw new NoPriceAvailableError(
+        instrumentId,
+      );
     }
 
-    if (!tick) {
-      throw new NoPriceAvailableError(instrumentId);
-    }
+    this.assertValidTick(
+      tick,
+      instrument,
+    );
 
+    /**
+     * Settlement staleness is measured relative to the settlement
+     * timestamp, not the current wall clock.
+     */
     const ageSeconds =
-      Math.abs(
-        tick.observedAt.getTime() -
-          at.getTime(),
-      ) / 1000;
+      (at.getTime() -
+        tick.observedAt.getTime()) /
+      1000;
+
+    /**
+     * Defensive protection against an impossible future tick.
+     */
+    if (ageSeconds < 0) {
+      throw new StalePriceError({
+        instrumentId,
+        ageSeconds: 0,
+        maxAgeSeconds:
+          instrument.maxPriceAgeSeconds,
+      });
+    }
 
     if (
       ageSeconds >
@@ -301,17 +416,26 @@ export class PriceFeedService implements OnModuleInit {
     ) {
       throw new StalePriceError({
         instrumentId,
-        ageSeconds: Math.round(ageSeconds),
+        ageSeconds: Math.round(
+          ageSeconds,
+        ),
         maxAgeSeconds:
           instrument.maxPriceAgeSeconds,
       });
     }
 
-    return toPriceQuote(
+    const priceQuote = toPriceQuote(
       tick,
       instrument,
       false,
     );
+
+    this.assertValidPriceQuote(
+      priceQuote,
+      instrument,
+    );
+
+    return priceQuote;
   }
 
   /**
@@ -335,7 +459,8 @@ export class PriceFeedService implements OnModuleInit {
 
     if (!this.provider.isConfigured()) {
       this.logger.warn(
-        `Market-data refresh skipped instrument=${instrument.displaySymbol} provider=${this.provider.name} reason=provider-not-configured`,
+        `Market-data refresh skipped instrument=${instrument.displaySymbol} ` +
+          `provider=${this.provider.name} reason=provider-not-configured`,
       );
 
       return undefined;
@@ -343,13 +468,20 @@ export class PriceFeedService implements OnModuleInit {
 
     if (this.isProviderRateLimited()) {
       this.logger.warn(
-        `Market-data refresh skipped instrument=${instrument.displaySymbol} provider=${this.provider.name} reason=provider-rate-limit-cooldown`,
+        `Market-data refresh skipped instrument=${instrument.displaySymbol} ` +
+          `provider=${this.provider.name} reason=provider-rate-limit-cooldown`,
       );
 
       return undefined;
     }
 
     try {
+      /**
+       * Record the actual provider request attempt.
+       *
+       * Manual refreshes also respect the rate-limit cooldown, but do not
+       * manipulate the scheduler's global refresh timestamp.
+       */
       const quotes =
         await this.provider.getQuotes([
           {
@@ -360,11 +492,27 @@ export class PriceFeedService implements OnModuleInit {
           },
         ]);
 
-      const quote = quotes[0];
+      const quote = quotes.find(
+        (candidate) =>
+          candidate.providerSymbol ===
+          instrument.providerSymbol,
+      );
 
       if (!quote) {
         this.logger.warn(
-          `market-data refresh: no quote returned instrument=${instrument.displaySymbol} provider=${this.provider.name}`,
+          `market-data refresh: no quote returned ` +
+            `instrument=${instrument.displaySymbol} ` +
+            `provider=${this.provider.name}`,
+        );
+
+        return undefined;
+      }
+
+      if (!quote.priceDecimal) {
+        this.logger.warn(
+          `market-data refresh: provider returned an empty price ` +
+            `instrument=${instrument.displaySymbol} ` +
+            `provider=${this.provider.name}`,
         );
 
         return undefined;
@@ -375,15 +523,20 @@ export class PriceFeedService implements OnModuleInit {
           instrument,
           {
             priceDecimal:
-              quote.priceDecimal,
-            source: this.provider.name,
+              String(
+                quote.priceDecimal,
+              ),
+            source:
+              this.provider.name,
             observedAt:
               quote.observedAt,
           },
         );
 
       this.logger.debug(
-        `market-data refresh: instrument=${instrument.displaySymbol} provider=${this.provider.name} price=${quote.priceDecimal}`,
+        `market-data refresh: instrument=${instrument.displaySymbol} ` +
+          `provider=${this.provider.name} ` +
+          `price=${quote.priceDecimal}`,
       );
 
       return ingested;
@@ -402,31 +555,26 @@ export class PriceFeedService implements OnModuleInit {
    *
    * IMPORTANT:
    *
-   * We intentionally make ONE provider request containing all instruments.
+   * Exactly ONE provider request is made for all refreshable instruments.
    *
-   * Previous implementation:
+   * Example:
    *
-   *   Promise.all(
-   *     active.map(instrument =>
-   *       refreshFromProvider(instrument)
-   *     )
-   *   )
+   * BTC + ETH + SOL + XRP
    *
-   * With four instruments this produced four concurrent CoinGecko
-   * requests every cycle.
+   * instead of:
    *
-   * The new implementation produces one request:
-   *
-   *   BTC + ETH + SOL + XRP
-   *
-   * This significantly reduces request pressure against CoinGecko.
+   * BTC request
+   * ETH request
+   * SOL request
+   * XRP request
    */
   async refreshAllActive(): Promise<void> {
     const started = Date.now();
 
     if (!this.provider.isConfigured()) {
       this.logger.warn(
-        `market-data refresh skipped provider=${this.provider.name} reason=provider-not-configured`,
+        `market-data refresh skipped provider=${this.provider.name} ` +
+          `reason=provider-not-configured`,
       );
 
       return;
@@ -434,7 +582,8 @@ export class PriceFeedService implements OnModuleInit {
 
     if (this.providerRefreshing) {
       this.logger.warn(
-        `market-data refresh skipped provider=${this.provider.name} reason=previous-refresh-still-running`,
+        `market-data refresh skipped provider=${this.provider.name} ` +
+          `reason=previous-refresh-still-running`,
       );
 
       return;
@@ -446,10 +595,12 @@ export class PriceFeedService implements OnModuleInit {
         Date.now();
 
       this.logger.warn(
-        `market-data refresh skipped provider=${this.provider.name} reason=rate-limit-cooldown remainingMs=${Math.max(
-          0,
-          remainingMs,
-        )}`,
+        `market-data refresh skipped provider=${this.provider.name} ` +
+          `reason=rate-limit-cooldown ` +
+          `remainingMs=${Math.max(
+            0,
+            remainingMs,
+          )}`,
       );
 
       return;
@@ -465,17 +616,18 @@ export class PriceFeedService implements OnModuleInit {
         PROVIDER_MIN_REFRESH_INTERVAL_MS
     ) {
       this.logger.debug(
-        `market-data refresh skipped provider=${this.provider.name} reason=minimum-refresh-interval remainingMs=${
-          PROVIDER_MIN_REFRESH_INTERVAL_MS -
-          elapsedSinceLastRefresh
-        }`,
+        `market-data refresh skipped provider=${this.provider.name} ` +
+          `reason=minimum-refresh-interval ` +
+          `remainingMs=${
+            PROVIDER_MIN_REFRESH_INTERVAL_MS -
+            elapsedSinceLastRefresh
+          }`,
       );
 
       return;
     }
 
     this.providerRefreshing = true;
-    this.lastProviderRefreshAt = Date.now();
 
     let active: Instrument[] = [];
 
@@ -489,18 +641,20 @@ export class PriceFeedService implements OnModuleInit {
 
       if (active.length === 0) {
         this.logger.debug(
-          `market-data refresh skipped provider=${this.provider.name} reason=no-active-instruments`,
+          `market-data refresh skipped provider=${this.provider.name} ` +
+            `reason=no-active-instruments`,
         );
 
         return;
       }
 
-      const refreshable = active.filter(
-        (instrument) =>
-          Boolean(
-            instrument.providerSymbol,
-          ),
-      );
+      const refreshable =
+        active.filter(
+          (instrument) =>
+            Boolean(
+              instrument.providerSymbol,
+            ),
+        );
 
       const skipped =
         active.length -
@@ -508,13 +662,23 @@ export class PriceFeedService implements OnModuleInit {
 
       if (refreshable.length === 0) {
         this.logger.warn(
-          `market-data refresh completed provider=${this.provider.name} succeeded=0 failed=0 skipped=${skipped} durationMs=${
-            Date.now() - started
-          }`,
+          `market-data refresh completed provider=${this.provider.name} ` +
+            `succeeded=0 failed=0 skipped=${skipped} ` +
+            `durationMs=${
+              Date.now() - started
+            }`,
         );
 
         return;
       }
+
+      /**
+       * Record the timestamp immediately before the actual provider
+       * request. Database/instrument lookup failures therefore do not
+       * incorrectly consume the provider refresh interval.
+       */
+      this.lastProviderRefreshAt =
+        Date.now();
 
       /**
        * ONE provider request for ALL refreshable instruments.
@@ -555,7 +719,21 @@ export class PriceFeedService implements OnModuleInit {
           failed++;
 
           this.logger.warn(
-            `market-data refresh: no quote returned instrument=${instrument.displaySymbol} provider=${this.provider.name}`,
+            `market-data refresh: no quote returned ` +
+              `instrument=${instrument.displaySymbol} ` +
+              `provider=${this.provider.name}`,
+          );
+
+          continue;
+        }
+
+        if (!quote.priceDecimal) {
+          failed++;
+
+          this.logger.warn(
+            `market-data refresh: provider returned no price ` +
+              `instrument=${instrument.displaySymbol} ` +
+              `provider=${this.provider.name}`,
           );
 
           continue;
@@ -566,7 +744,9 @@ export class PriceFeedService implements OnModuleInit {
             instrument,
             {
               priceDecimal:
-                quote.priceDecimal,
+                String(
+                  quote.priceDecimal,
+                ),
               source:
                 this.provider.name,
               observedAt:
@@ -577,30 +757,38 @@ export class PriceFeedService implements OnModuleInit {
           succeeded++;
 
           this.logger.debug(
-            `market-data refresh: instrument=${instrument.displaySymbol} provider=${this.provider.name} price=${quote.priceDecimal}`,
+            `market-data refresh: instrument=${instrument.displaySymbol} ` +
+              `provider=${this.provider.name} ` +
+              `price=${quote.priceDecimal}`,
           );
         } catch (error) {
           failed++;
 
           this.logger.error(
-            `market-data ingest failed instrument=${instrument.displaySymbol} provider=${this.provider.name} error=${String(
-              error,
-            )}`,
+            `market-data ingest failed ` +
+              `instrument=${instrument.displaySymbol} ` +
+              `provider=${this.provider.name} ` +
+              `error=${String(error)}`,
           );
         }
       }
 
       this.logger.log(
-        `market-data refresh completed provider=${this.provider.name} succeeded=${succeeded} failed=${failed} skipped=${skipped} durationMs=${
-          Date.now() - started
-        }`,
+        `market-data refresh completed ` +
+          `provider=${this.provider.name} ` +
+          `succeeded=${succeeded} ` +
+          `failed=${failed} ` +
+          `skipped=${skipped} ` +
+          `durationMs=${
+            Date.now() - started
+          }`,
       );
     } catch (error) {
       /**
        * A provider-level failure means the entire batch failed.
        *
-       * Critically, we do NOT create fallback prices.
-       * Existing ticks remain unchanged and will eventually become stale.
+       * Critically, no fallback/fake prices are created.
+       * Existing ticks remain unchanged and will naturally become stale.
        */
       this.handleProviderError(
         'batch',
@@ -608,9 +796,13 @@ export class PriceFeedService implements OnModuleInit {
       );
 
       this.logger.log(
-        `market-data refresh completed provider=${this.provider.name} succeeded=0 failed=${active.length} durationMs=${
-          Date.now() - started
-        }`,
+        `market-data refresh completed ` +
+          `provider=${this.provider.name} ` +
+          `succeeded=0 ` +
+          `failed=${active.length} ` +
+          `durationMs=${
+            Date.now() - started
+          }`,
       );
     } finally {
       this.providerRefreshing = false;
@@ -638,32 +830,91 @@ export class PriceFeedService implements OnModuleInit {
     instrument: string,
     error: unknown,
   ): void {
-    const message = String(error);
+    const message =
+      this.errorMessage(error);
 
-    if (this.isRateLimitError(message)) {
+    if (this.isRateLimitError(error)) {
       this.providerRateLimitedUntil =
         Date.now() +
         PROVIDER_RATE_LIMIT_COOLDOWN_MS;
 
       this.logger.warn(
-        `market-data provider rate-limited provider=${this.provider.name} instrument=${instrument} cooldownMs=${PROVIDER_RATE_LIMIT_COOLDOWN_MS}`,
+        `market-data provider rate-limited ` +
+          `provider=${this.provider.name} ` +
+          `instrument=${instrument} ` +
+          `cooldownMs=${PROVIDER_RATE_LIMIT_COOLDOWN_MS}`,
       );
 
       return;
     }
 
     this.logger.error(
-      `market-data refresh failed instrument=${instrument} provider=${this.provider.name} error=${message}`,
+      `market-data refresh failed ` +
+        `instrument=${instrument} ` +
+        `provider=${this.provider.name} ` +
+        `error=${message}`,
     );
   }
 
   /**
-   * Detect rate-limit errors without coupling the service to a
-   * provider-specific error class.
+   * Extract a useful error message without relying on String(error)
+   * for every possible provider error shape.
+   */
+  private errorMessage(
+    error: unknown,
+  ): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    if (
+      typeof error === 'object' &&
+      error !== null
+    ) {
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return String(error);
+      }
+    }
+
+    return String(error);
+  }
+
+  /**
+   * Detect provider rate-limit errors.
+   *
+   * Supports common HTTP/client error shapes while retaining a
+   * provider-neutral implementation.
    */
   private isRateLimitError(
-    message: string,
+    error: unknown,
   ): boolean {
+    if (
+      typeof error === 'object' &&
+      error !== null
+    ) {
+      const candidate =
+        error as {
+          status?: unknown;
+          statusCode?: unknown;
+          response?: {
+            status?: unknown;
+          };
+        };
+
+      if (
+        candidate.status === 429 ||
+        candidate.statusCode === 429 ||
+        candidate.response?.status === 429
+      ) {
+        return true;
+      }
+    }
+
+    const message =
+      this.errorMessage(error);
+
     return (
       /\b429\b/.test(message) ||
       /too many requests/i.test(
@@ -673,6 +924,87 @@ export class PriceFeedService implements OnModuleInit {
     );
   }
 
+  /**
+   * Validate a persisted tick before exposing it to trading code.
+   *
+   * This is deliberately defensive because financial calculations must
+   * never operate on an invalid market price.
+   */
+  private assertValidTick(
+    tick: PriceTick,
+    instrument: Instrument,
+  ): void {
+    if (!tick) {
+      throw new NoPriceAvailableError(
+        instrument.id,
+      );
+    }
+
+    if (tick.price === null || tick.price === undefined) {
+      throw new NoPriceAvailableError(
+        instrument.id,
+      );
+    }
+
+    if (tick.price <= 0n) {
+      throw new BadRequestException(
+        `Invalid non-positive price for instrument ${instrument.displaySymbol}`,
+      );
+    }
+
+    if (
+      !(tick.observedAt instanceof Date) ||
+      Number.isNaN(
+        tick.observedAt.getTime(),
+      )
+    ) {
+      throw new NoPriceAvailableError(
+        instrument.id,
+      );
+    }
+  }
+
+  /**
+   * Validate the public quote returned to API/frontend consumers.
+   *
+   * This catches a broken price-quote mapping at the service boundary
+   * instead of allowing:
+   *
+   *   price: undefined
+   *
+   * to propagate into the frontend.
+   */
+  private assertValidPriceQuote(
+  quote: PriceQuote,
+  instrument: Instrument,
+): void {
+  if (!quote) {
+    throw new NoPriceAvailableError(instrument.id);
+  }
+
+  const price = quote.price?.trim();
+
+  if (!price) {
+    this.logger.error(
+      `Invalid PriceQuote produced for instrument=${instrument.displaySymbol}. ` +
+        `The PriceQuote mapper did not expose a price value.`,
+    );
+
+    throw new NoPriceAvailableError(instrument.id);
+  }
+
+  if (!/^[+]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(price)) {
+    throw new BadRequestException(
+      `Invalid price quote for instrument ${instrument.displaySymbol}`,
+    );
+  }
+
+  if (decimalStringToScaledBigInt(price, instrument.pricePrecision) <= 0n) {
+    throw new BadRequestException(
+      `Invalid price quote for instrument ${instrument.displaySymbol}`,
+    );
+  }
+}
   /**
    * Live tick stream for a specific instrument.
    */

@@ -31,9 +31,7 @@ export function serializeMarketCategory(category: MarketCategory) {
 export function serializePriceQuote(quote: PriceQuote) {
   return {
     instrumentId: quote.instrumentId,
-    price: quote.price.toDecimalString(),
-    priceMinorUnits: quote.price.toMinorUnits().toString(),
-    currency: quote.price.currency.code,
+    price: quote.price,
     source: quote.source,
     observedAt: quote.observedAt,
     receivedAt: quote.receivedAt,

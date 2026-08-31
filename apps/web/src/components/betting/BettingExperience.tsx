@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -93,6 +92,7 @@ export function BettingExperience() {
   const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
   const [submitError, setSubmitError] = useState<{
     title: string;
     canRetry: boolean;
@@ -100,6 +100,12 @@ export function BettingExperience() {
 
   const reviewedPayoutRateBasisPoints = useRef<string | null>(null);
   const idempotencyKey = useRef<string | null>(null);
+
+  /*
+   * --------------------------------------------------------------------------
+   * DATA
+   * --------------------------------------------------------------------------
+   */
 
   const instrumentsQuery = useQuery({
     queryKey: ['instruments'],
@@ -114,18 +120,26 @@ export function BettingExperience() {
 
   useInstrumentRealtimeSubscription(instrumentId || undefined);
 
+  /*
+   * Price is useful for display and for products such as Higher / Lower,
+   * but it must NOT be used as a global UI blocker.
+   *
+   * The server remains authoritative for the actual entry price.
+   */
   const priceQuery = useQuery({
     queryKey: ['price', instrumentId],
     queryFn: () => getPrice(instrumentId),
     enabled: Boolean(instrumentId),
     refetchInterval: 5_000,
+    retry: 2,
   });
 
   const configQuery = useQuery({
     queryKey: ['betting-config', instrumentId, type],
     queryFn: () => getBettingConfig(instrumentId, type),
     enabled:
-      Boolean(instrumentId) && authStatus === 'authenticated',
+      Boolean(instrumentId) &&
+      authStatus === 'authenticated',
     refetchInterval: 15_000,
     retry: false,
   });
@@ -139,13 +153,21 @@ export function BettingExperience() {
     refetchInterval: 10_000,
   });
 
+  /*
+   * --------------------------------------------------------------------------
+   * PRODUCT / CONFIG
+   * --------------------------------------------------------------------------
+   */
+
   const product =
-    PRODUCTS.find((item) => item.type === type) ?? PRODUCTS[0];
-  const minStakeSeconds = configQuery.data
+    PRODUCTS.find((item) => item.type === type) ??
+    PRODUCTS[0];
+
+  const minDurationSeconds = configQuery.data
     ? Number(configQuery.data.minDurationSeconds)
     : undefined;
 
-  const maxStakeSeconds = configQuery.data
+  const maxDurationSeconds = configQuery.data
     ? Number(configQuery.data.maxDurationSeconds)
     : undefined;
 
@@ -153,53 +175,71 @@ export function BettingExperience() {
     () =>
       DURATION_PRESETS.filter(
         (preset) =>
-          (minStakeSeconds === undefined ||
-            preset.seconds >= minStakeSeconds) &&
-          (maxStakeSeconds === undefined ||
-            preset.seconds <= maxStakeSeconds),
+          (minDurationSeconds === undefined ||
+            preset.seconds >= minDurationSeconds) &&
+          (maxDurationSeconds === undefined ||
+            preset.seconds <= maxDurationSeconds),
       ),
-    [minStakeSeconds, maxStakeSeconds],
+    [minDurationSeconds, maxDurationSeconds],
   );
 
   /*
-   * Reset ticket-specific state whenever the bet type changes.
-   * A direction, strike, or duration selected for one product
-   * should not silently carry into another product.
+   * --------------------------------------------------------------------------
+   * RESET STATE WHEN PRODUCT CHANGES
+   * --------------------------------------------------------------------------
    */
+
   useEffect(() => {
     setSelection(
-      PRODUCTS.find((item) => item.type === type)?.choices[0] ?? 'rise',
+      PRODUCTS.find((item) => item.type === type)?.choices[0] ??
+        'rise',
     );
+
     setTargetPrice('');
     setReviewing(false);
     setSubmitError(null);
     setDurationSeconds(null);
     idempotencyKey.current = null;
+    reviewedPayoutRateBasisPoints.current = null;
   }, [type]);
 
   /*
-   * Reset ticket-specific state whenever the instrument changes.
+   * --------------------------------------------------------------------------
+   * RESET STATE WHEN INSTRUMENT CHANGES
+   * --------------------------------------------------------------------------
    */
+
   useEffect(() => {
     setReviewing(false);
     setSubmitError(null);
     setDurationSeconds(null);
     setTargetPrice('');
     idempotencyKey.current = null;
+    reviewedPayoutRateBasisPoints.current = null;
   }, [instrumentId]);
 
   /*
-   * Select the first valid duration once the server configuration
-   * has loaded.
+   * --------------------------------------------------------------------------
+   * DEFAULT DURATION
+   * --------------------------------------------------------------------------
    */
+
   useEffect(() => {
     if (
       durationSeconds === null &&
       validDurationPresets.length > 0
     ) {
-      setDurationSeconds(validDurationPresets[0]!.seconds);
+      setDurationSeconds(
+        validDurationPresets[0]!.seconds,
+      );
     }
   }, [durationSeconds, validDurationPresets]);
+
+  /*
+   * --------------------------------------------------------------------------
+   * MONEY
+   * --------------------------------------------------------------------------
+   */
 
   let minorStake: bigint | null = null;
 
@@ -240,6 +280,12 @@ export function BettingExperience() {
     balance = undefined;
   }
 
+  /*
+   * --------------------------------------------------------------------------
+   * VALIDATION
+   * --------------------------------------------------------------------------
+   */
+
   const stakeInBounds = Boolean(
     minorStake !== null &&
       minorStake > 0n &&
@@ -255,9 +301,18 @@ export function BettingExperience() {
       minorStake <= balance,
   );
 
+  /*
+   * Higher / Lower genuinely needs a user supplied strike.
+   *
+   * It does NOT require the client to have a price quote merely to
+   * interact with the ticket. The server validates the actual market
+   * state when the bet is submitted.
+   */
   const targetPriceValid =
     type !== 'higher_lower' ||
-    /^\d+(?:\.\d+)?$/.test(targetPrice.trim());
+    /^\d+(?:\.\d+)?$/.test(
+      targetPrice.trim(),
+    );
 
   const estimatedPayoutMinorUnits =
     minorStake !== null &&
@@ -265,47 +320,128 @@ export function BettingExperience() {
     instrument
       ? estimatePotentialPayoutMinorUnits(
           minorStake,
-          BigInt(configQuery.data.payoutRateBasisPoints),
+          BigInt(
+            configQuery.data.payoutRateBasisPoints,
+          ),
           instrument.quoteCurrency,
         )
       : null;
 
+  /*
+   * --------------------------------------------------------------------------
+   * PRICE STATUS
+   * --------------------------------------------------------------------------
+   *
+   * IMPORTANT:
+   * This is informational only.
+   *
+   * A missing/stale browser quote does not globally disable betting.
+   * The API must obtain/validate the authoritative price server-side.
+   */
+
+  const priceAvailable = Boolean(
+    priceQuery.data,
+  );
+
+  const priceFresh = Boolean(
+    priceQuery.data &&
+      !priceQuery.data.isStale,
+  );
+
+  /*
+   * --------------------------------------------------------------------------
+   * REVIEW CHECKS
+   * --------------------------------------------------------------------------
+   *
+   * Notice that priceAvailable is deliberately NOT here.
+   *
+   * This means:
+   *
+   *   - selecting an instrument works
+   *   - selecting Rise/Fall works
+   *   - selecting Higher/Lower works
+   *   - selecting Up/Down works
+   *   - stake entry works
+   *   - duration selection works
+   *   - Review Bet remains available
+   *
+   * The server decides whether the final bet can actually be accepted.
+   */
+
   const reviewChecks = {
-  authenticated: authStatus === 'authenticated',
-  instrumentSelected: Boolean(instrument),
-  instrumentActive: instrument?.status === 'active',
-  priceAvailable: Boolean(priceQuery.data),
-  priceFresh: Boolean(priceQuery.data && !priceQuery.data.isStale),
-  bettingConfigLoaded: Boolean(configQuery.data),
-  bettingEnabled: Boolean(configQuery.data?.isEnabled),
-  durationSelected: durationSeconds !== null,
-  stakeInBounds,
-  hasBalance,
-  targetPriceValid,
-};
+    authenticated:
+      authStatus === 'authenticated',
 
-const canReview = Object.values(reviewChecks).every(Boolean);
+    instrumentSelected:
+      Boolean(instrument),
 
+    instrumentActive:
+      instrument?.status === 'active',
 
-if (typeof window !== 'undefined') {
-  console.log('[FentiCoin] Review checks:', reviewChecks);
-  console.log('[FentiCoin] Betting state:', {
-    authStatus,
-    instrument,
-    price: priceQuery.data,
-    config: configQuery.data,
-    wallet: walletQuery.data,
-    stake,
-    minorStake: minorStake?.toString(),
-    minStake: minStake?.toString(),
-    maxStake: maxStake?.toString(),
-    balance: balance?.toString(),
-    durationSeconds,
-    targetPrice,
-    type,
-    selection,
-  });
-}
+    bettingConfigLoaded:
+      Boolean(configQuery.data),
+
+    bettingEnabled:
+      Boolean(configQuery.data?.isEnabled),
+
+    durationSelected:
+      durationSeconds !== null,
+
+    stakeInBounds,
+
+    hasBalance,
+
+    targetPriceValid,
+  };
+
+  const canReview =
+    Object.values(reviewChecks).every(Boolean);
+
+  /*
+   * --------------------------------------------------------------------------
+   * DEVELOPMENT LOGGING
+   * --------------------------------------------------------------------------
+   */
+
+  if (typeof window !== 'undefined') {
+    console.log(
+      '[FentiCoin] Review checks:',
+      reviewChecks,
+    );
+
+    console.log(
+      '[FentiCoin] Betting state:',
+      {
+        authStatus,
+        instrument,
+        price: priceQuery.data,
+        priceAvailable,
+        priceFresh,
+        config: configQuery.data,
+        wallet: walletQuery.data,
+        stake,
+        minorStake:
+          minorStake?.toString(),
+        minStake:
+          minStake?.toString(),
+        maxStake:
+          maxStake?.toString(),
+        balance:
+          balance?.toString(),
+        durationSeconds,
+        targetPrice,
+        type,
+        selection,
+      },
+    );
+  }
+
+  /*
+   * --------------------------------------------------------------------------
+   * CONFIRM BET
+   * --------------------------------------------------------------------------
+   */
+
   async function confirmBet() {
     if (
       !instrument ||
@@ -321,82 +457,133 @@ if (typeof window !== 'undefined') {
     setSubmitError(null);
 
     try {
-      idempotencyKey.current ??= crypto.randomUUID();
+      /*
+       * One idempotency key is retained for retries of the same
+       * confirmation attempt.
+       *
+       * It is cleared only after a successful server response.
+       */
+      idempotencyKey.current ??=
+        crypto.randomUUID();
 
       const bet = await placeBet(
         {
           instrumentId: instrument.id,
           type,
           selection,
-          stakeAmount: minorStake.toString(),
-          currency: instrument.quoteCurrency,
+          stakeAmount:
+            minorStake.toString(),
+          currency:
+            instrument.quoteCurrency,
           durationSeconds,
+
           ...(type === 'higher_lower'
-            ? { targetPrice: targetPrice.trim() }
+            ? {
+                targetPrice:
+                  targetPrice.trim(),
+              }
             : {}),
         },
         idempotencyKey.current,
       );
 
+      /*
+       * Success.
+       */
+
       setReviewing(false);
+
       idempotencyKey.current = null;
+
       setStake('');
       setTargetPrice('');
 
       show({
         tone: 'success',
         title: 'Bet confirmed',
-        description: `${instrument.displaySymbol} · ${product?.title} · ${selection} · ${formatCurrencyMinorUnits(
-          bet.stakeAmountMinorUnits,
-          bet.currency,
-        )} staked`,
+        description:
+          `${instrument.displaySymbol} · ` +
+          `${product.title} · ` +
+          `${selection} · ` +
+          `${formatCurrencyMinorUnits(
+            bet.stakeAmountMinorUnits,
+            bet.currency,
+          )} staked`,
       });
 
       /*
-       * The configuration shown during review may have changed
-       * before confirmation. The server-side snapshotted payout
-       * rate is authoritative for the actual bet.
+       * The server's returned payout rate is authoritative.
        */
+
       if (
-        reviewedPayoutRateBasisPoints.current !== null &&
+        reviewedPayoutRateBasisPoints.current !==
+          null &&
         reviewedPayoutRateBasisPoints.current !==
           bet.payoutRateBasisPoints
       ) {
         show({
           tone: 'info',
-          title: 'Odds changed before your bet was confirmed',
-          description: `Final payout rate: ${(
-            Number(bet.payoutRateBasisPoints) / 100
-          ).toFixed(
-            2,
-          )}% profit (this bet's payout is locked in and unaffected by any further changes).`,
+          title:
+            'Odds changed before your bet was confirmed',
+          description:
+            `Final payout rate: ${(
+              Number(
+                bet.payoutRateBasisPoints,
+              ) / 100
+            ).toFixed(
+              2,
+            )}% profit. This bet's payout is locked in and will not change.`,
           durationMs: 9_000,
         });
       }
 
-      reviewedPayoutRateBasisPoints.current = null;
+      reviewedPayoutRateBasisPoints.current =
+        null;
 
       await Promise.all([
         walletQuery.refetch(),
         configQuery.refetch(),
+
         queryClient.invalidateQueries({
           queryKey: ['bets', 'recent'],
         }),
       ]);
     } catch (error) {
-      setSubmitError(describeApiError(error));
+      /*
+       * Keep the idempotency key.
+       *
+       * If the error is retryable, pressing Confirm again
+       * retries the same logical request rather than creating
+       * a second bet.
+       */
+      setSubmitError(
+        describeApiError(error),
+      );
     } finally {
       setSubmitting(false);
     }
   }
 
+  /*
+   * --------------------------------------------------------------------------
+   * REVIEW
+   * --------------------------------------------------------------------------
+   */
+
   function openReview() {
     reviewedPayoutRateBasisPoints.current =
-      configQuery.data?.payoutRateBasisPoints ?? null;
+      configQuery.data?.payoutRateBasisPoints ??
+      null;
 
     setReviewing(true);
     setSubmitError(null);
   }
+
+  /*
+   * --------------------------------------------------------------------------
+   * RENDER
+   * --------------------------------------------------------------------------
+   */
 
   return (
     <section
@@ -422,7 +609,8 @@ if (typeof window !== 'undefined') {
             Available:{' '}
             {walletQuery.data
               ? formatCurrencyMinorUnits(
-                  walletQuery.data.availableMinorUnits,
+                  walletQuery.data
+                    .availableMinorUnits,
                   walletQuery.data.currency,
                 )
               : '…'}
@@ -433,7 +621,8 @@ if (typeof window !== 'undefined') {
       {authStatus === 'unauthenticated' && (
         <div className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-50 p-4">
           <p className="text-sm font-semibold text-brand-700">
-            Log in to see live odds, your balance, and place a bet.
+            Log in to see live odds, your balance,
+            and place a bet.
           </p>
 
           <Link
@@ -457,7 +646,9 @@ if (typeof window !== 'undefined') {
                 <button
                   key={item.type}
                   type="button"
-                  onClick={() => setType(item.type)}
+                  onClick={() =>
+                    setType(item.type)
+                  }
                   className={`rounded-xl border px-2 py-3 text-left transition ${
                     type === item.type
                       ? 'border-brand-500 bg-brand-50 text-brand-700'
@@ -481,7 +672,9 @@ if (typeof window !== 'undefined') {
               <select
                 value={instrumentId}
                 onChange={(event) =>
-                  setInstrumentId(event.target.value)
+                  setInstrumentId(
+                    event.target.value,
+                  )
                 }
                 className="mt-2 w-full rounded-xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none ring-brand-500 focus:ring-2"
               >
@@ -493,10 +686,14 @@ if (typeof window !== 'undefined') {
                   <option
                     key={item.id}
                     value={item.id}
-                    disabled={item.status !== 'active'}
+                    disabled={
+                      item.status !== 'active'
+                    }
                   >
-                    {item.displaySymbol} · {item.name}
-                    {item.status !== 'active'
+                    {item.displaySymbol} ·{' '}
+                    {item.name}
+                    {item.status !==
+                    'active'
                       ? ' (closed)'
                       : ''}
                   </option>
@@ -524,10 +721,30 @@ if (typeof window !== 'undefined') {
             {instrument && (
               <PriceQuoteBadge
                 price={priceQuery.data}
-                currency={instrument.quoteCurrency}
-                loading={priceQuery.isLoading}
+                currency={
+                  instrument.quoteCurrency
+                }
+                loading={
+                  priceQuery.isLoading
+                }
                 className="mt-4"
               />
+            )}
+
+            {instrument && (
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-neutral-50 px-3 py-2">
+                <span className="text-xs font-medium text-neutral-500">
+                  Market price
+                </span>
+
+                <span className="text-xs font-semibold text-neutral-700">
+                  {priceAvailable
+                    ? priceFresh
+                      ? 'Live quote'
+                      : 'Quote updating'
+                    : 'Awaiting quote'}
+                </span>
+              </div>
             )}
           </div>
 
@@ -537,34 +754,38 @@ if (typeof window !== 'undefined') {
             </p>
 
             <div className="mt-3 grid grid-cols-2 gap-3">
-              {product?.choices.map((choice, index) => (
-                <button
-                  key={choice}
-                  type="button"
-                  onClick={() => setSelection(choice)}
-                  className={`flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-bold capitalize transition ${
-                    selection === choice
-                      ? index === 0
-                        ? 'bg-brand-500 text-navy-950'
-                        : 'bg-loss-500 text-white'
-                      : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-                  }`}
-                >
-                  {index === 0 ? (
-                    <ArrowUp
-                      className="h-4 w-4"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <ArrowDown
-                      className="h-4 w-4"
-                      aria-hidden="true"
-                    />
-                  )}
+              {product.choices.map(
+                (choice, index) => (
+                  <button
+                    key={choice}
+                    type="button"
+                    onClick={() =>
+                      setSelection(choice)
+                    }
+                    className={`flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-bold capitalize transition ${
+                      selection === choice
+                        ? index === 0
+                          ? 'bg-brand-500 text-navy-950'
+                          : 'bg-loss-500 text-white'
+                        : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                    }`}
+                  >
+                    {index === 0 ? (
+                      <ArrowUp
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <ArrowDown
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                      />
+                    )}
 
-                  {choice}
-                </button>
-              ))}
+                    {choice}
+                  </button>
+                ),
+              )}
             </div>
 
             {type === 'higher_lower' && (
@@ -575,7 +796,9 @@ if (typeof window !== 'undefined') {
                   inputMode="decimal"
                   value={targetPrice}
                   onChange={(event) =>
-                    setTargetPrice(event.target.value)
+                    setTargetPrice(
+                      event.target.value,
+                    )
                   }
                   placeholder={
                     priceQuery.data
@@ -590,34 +813,42 @@ if (typeof window !== 'undefined') {
             <label className="mt-4 block text-sm font-semibold">
               Stake{' '}
               <span className="font-normal text-neutral-500">
-                ({instrument?.quoteCurrency ?? 'USD'})
+                (
+                {instrument?.quoteCurrency ??
+                  'USD'}
+                )
               </span>
 
               <input
                 inputMode="decimal"
                 value={stake}
                 onChange={(event) =>
-                  setStake(event.target.value)
+                  setStake(
+                    event.target.value,
+                  )
                 }
                 placeholder="0.00"
                 className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-3 text-lg font-bold outline-none focus:ring-2 focus:ring-brand-500"
               />
             </label>
 
-            {configQuery.data && instrument && (
-              <p className="mt-2 text-xs text-neutral-500">
-                Stake range:{' '}
-                {formatCurrencyMinorUnits(
-                  configQuery.data.minStakeMinorUnits,
-                  instrument.quoteCurrency,
-                )}
-                –
-                {formatCurrencyMinorUnits(
-                  configQuery.data.maxStakeMinorUnits,
-                  instrument.quoteCurrency,
-                )}
-              </p>
-            )}
+            {configQuery.data &&
+              instrument && (
+                <p className="mt-2 text-xs text-neutral-500">
+                  Stake range:{' '}
+                  {formatCurrencyMinorUnits(
+                    configQuery.data
+                      .minStakeMinorUnits,
+                    instrument.quoteCurrency,
+                  )}
+                  –
+                  {formatCurrencyMinorUnits(
+                    configQuery.data
+                      .maxStakeMinorUnits,
+                    instrument.quoteCurrency,
+                  )}
+                </p>
+              )}
 
             {stake &&
               minorStake !== null &&
@@ -638,9 +869,10 @@ if (typeof window !== 'undefined') {
               )}
 
             {configQuery.error &&
-              authStatus === 'authenticated' && (
+              authStatus ===
+                'authenticated' && (
                 <Notice
-                  text={`${product?.title} is not available for this market. ${
+                  text={`${product.title} is not available for this market. ${
                     describeApiError(
                       configQuery.error,
                     ).title
@@ -655,36 +887,49 @@ if (typeof window !== 'undefined') {
                   Duration
                 </p>
 
-                {validDurationPresets.length > 0 ? (
+                {validDurationPresets.length >
+                0 ? (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {validDurationPresets.map((preset) => (
-                      <button
-                        key={preset.seconds}
-                        type="button"
-                        onClick={() =>
-                          setDurationSeconds(
-                            preset.seconds,
-                          )
-                        }
-                        className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-                          durationSeconds ===
-                          preset.seconds
-                            ? 'bg-brand-500 text-navy-950'
-                            : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
+                    {validDurationPresets.map(
+                      (preset) => (
+                        <button
+                          key={
+                            preset.seconds
+                          }
+                          type="button"
+                          onClick={() =>
+                            setDurationSeconds(
+                              preset.seconds,
+                            )
+                          }
+                          className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+                            durationSeconds ===
+                            preset.seconds
+                              ? 'bg-brand-500 text-navy-950'
+                              : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ),
+                    )}
                   </div>
                 ) : (
                   <input
                     type="number"
-                    min={minStakeSeconds}
-                    max={maxStakeSeconds}
-                    value={durationSeconds ?? ''}
+                    min={
+                      minDurationSeconds
+                    }
+                    max={
+                      maxDurationSeconds
+                    }
+                    value={
+                      durationSeconds ??
+                      ''
+                    }
                     onChange={(event) => {
-                      const value = event.target.value;
+                      const value =
+                        event.target.value;
 
                       setDurationSeconds(
                         value === ''
@@ -706,7 +951,7 @@ if (typeof window !== 'undefined') {
           </p>
 
           <h2 className="mt-1 text-xl font-bold">
-            {product?.title}
+            {product.title}
           </h2>
 
           <dl className="mt-5 space-y-4 text-sm">
@@ -718,7 +963,8 @@ if (typeof window !== 'undefined') {
             <Row
               label="Stake"
               value={
-                minorStake !== null && instrument
+                minorStake !== null &&
+                instrument
                   ? formatCurrencyMinorUnits(
                       minorStake.toString(),
                       instrument.quoteCurrency,
@@ -750,7 +996,9 @@ if (typeof window !== 'undefined') {
                         configQuery.data
                           .payoutRateBasisPoints,
                       ) / 100
-                    ).toFixed(2)}% profit`
+                    ).toFixed(
+                      2,
+                    )}% profit`
                   : '—'
               }
             />
@@ -758,7 +1006,8 @@ if (typeof window !== 'undefined') {
             <Row
               label="Potential return (est.)"
               value={
-                estimatedPayoutMinorUnits !== null &&
+                estimatedPayoutMinorUnits !==
+                  null &&
                 instrument
                   ? `~${formatCurrencyMinorUnits(
                       estimatedPayoutMinorUnits.toString(),
@@ -770,21 +1019,29 @@ if (typeof window !== 'undefined') {
           </dl>
 
           <p className="mt-5 border-t border-white/10 pt-4 text-xs leading-5 text-white/55">
-            Estimate only, for your reference. The server
-            sets the live odds, entry price, and final
-            return when you confirm — it is always
-            authoritative.
+            Estimates are for reference only.
+            The server determines the
+            authoritative market price, entry
+            price, odds, and final return when
+            you confirm the bet.
           </p>
 
-          {priceQuery.data?.isStale && (
-            <Notice
-              text="Price is stale. Wait for a fresh quote before placing a bet."
-              className="mt-3"
-            />
-          )}
+          {instrument &&
+            priceQuery.error && (
+              <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                <p className="text-xs text-white/60">
+                  Market quote is updating.
+                  Betting controls remain
+                  available while the server
+                  validates the market at
+                  confirmation.
+                </p>
+              </div>
+            )}
 
           {instrument &&
-            instrument.status !== 'active' && (
+            instrument.status !==
+              'active' && (
               <Notice
                 text="This market is currently closed."
                 className="mt-3"
@@ -792,9 +1049,10 @@ if (typeof window !== 'undefined') {
             )}
 
           {configQuery.data &&
-            !configQuery.data.isEnabled && (
+            !configQuery.data
+              .isEnabled && (
               <Notice
-                text={`${product?.title} is not currently available for this market.`}
+                text={`${product.title} is not currently available for this market.`}
                 className="mt-3"
               />
             )}
@@ -812,7 +1070,9 @@ if (typeof window !== 'undefined') {
 
       {reviewing && instrument && (
         <ReviewModal
-          product={product?.title ?? '—'}
+          product={
+            product.title
+          }
           selection={selection}
           stake={
             minorStake !== null
@@ -823,7 +1083,8 @@ if (typeof window !== 'undefined') {
               : '—'
           }
           estimate={
-            estimatedPayoutMinorUnits !== null
+            estimatedPayoutMinorUnits !==
+            null
               ? formatCurrencyMinorUnits(
                   estimatedPayoutMinorUnits.toString(),
                   instrument.quoteCurrency,
@@ -833,13 +1094,16 @@ if (typeof window !== 'undefined') {
           submitting={submitting}
           error={submitError}
           onCancel={() =>
-            !submitting && setReviewing(false)
+            !submitting &&
+            setReviewing(false)
           }
           onConfirm={confirmBet}
         />
       )}
 
-      <BetsPanel instruments={instruments} />
+      <BetsPanel
+        instruments={instruments}
+      />
     </section>
   );
 }
@@ -853,7 +1117,10 @@ function Row({
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <dt className="text-white/60">{label}</dt>
+      <dt className="text-white/60">
+        {label}
+      </dt>
+
       <dd className="font-semibold capitalize">
         {value}
       </dd>
@@ -890,7 +1157,9 @@ function ReviewModal({
   };
 
   const containerRef =
-    useDialogA11y<HTMLDivElement>(closeIfIdle);
+    useDialogA11y<HTMLDivElement>(
+      closeIfIdle,
+    );
 
   return (
     <div
@@ -923,19 +1192,28 @@ function ReviewModal({
         <div className="mt-5 rounded-xl bg-neutral-50 p-4 text-sm">
           <div className="flex justify-between">
             <span>Stake</span>
-            <strong>{stake}</strong>
+            <strong>
+              {stake}
+            </strong>
           </div>
 
           <div className="mt-3 flex justify-between">
-            <span>Estimated return</span>
-            <strong>~{estimate}</strong>
+            <span>
+              Estimated return
+            </span>
+
+            <strong>
+              ~{estimate}
+            </strong>
           </div>
         </div>
 
         <p className="mt-4 text-xs leading-5 text-neutral-500">
-          Final odds and return are set by the server when
-          you confirm. A changed market rule may alter or
-          reject this bet.
+          Final odds, entry price, and return
+          are determined by the server when
+          you confirm. If the market is no
+          longer valid, the server can reject
+          the bet safely.
         </p>
 
         {error && (

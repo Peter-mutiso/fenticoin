@@ -1,6 +1,8 @@
+
 import { Injectable } from '@nestjs/common';
 
 import { AppConfigService } from '../../config/app-config.service';
+
 import type {
   MarketDataProvider,
   MarketDataQuote,
@@ -28,7 +30,7 @@ interface CoinGeckoSimplePriceResponse {
  * 1. Requesting market data from CoinGecko.
  * 2. Validating the response shape.
  * 3. Returning prices as decimal strings.
- * 4. Returning the provider observation timestamp.
+ * 4. Returning a trusted provider observation timestamp.
  *
  * PriceFeedService is responsible for converting the decimal string into
  * the instrument's exact scaled bigint representation.
@@ -81,8 +83,8 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
     }
 
     /**
-     * Remove duplicate provider symbols and currencies so the request
-     * remains as small as possible.
+     * Remove duplicate provider symbols so the request remains
+     * as small as possible.
      */
     const ids = [
       ...new Set(
@@ -90,6 +92,9 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
       ),
     ];
 
+    /**
+     * Remove duplicate quote currencies as well.
+     */
     const currencies = [
       ...new Set(
         requests.map((request) =>
@@ -101,8 +106,14 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
     const url = new URL(SIMPLE_PRICE_ENDPOINT);
 
     url.searchParams.set('ids', ids.join(','));
-    url.searchParams.set('vs_currencies', currencies.join(','));
-    url.searchParams.set('include_last_updated_at', 'true');
+    url.searchParams.set(
+      'vs_currencies',
+      currencies.join(','),
+    );
+    url.searchParams.set(
+      'include_last_updated_at',
+      'true',
+    );
 
     /**
      * Only send the Demo API key when one is configured.
@@ -112,7 +123,8 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
     };
 
     if (this.config.coinGeckoApiKey) {
-      headers['x-cg-demo-api-key'] = this.config.coinGeckoApiKey;
+      headers['x-cg-demo-api-key'] =
+        this.config.coinGeckoApiKey;
     }
 
     const response = await fetch(url, {
@@ -123,8 +135,8 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
     /**
      * Do not retry here.
      *
-     * PriceFeedService detects 429 and activates the global provider
-     * cooldown. Retrying here would defeat that protection.
+     * PriceFeedService detects 429 and activates the global
+     * provider cooldown. Retrying here would defeat that protection.
      */
     if (!response.ok) {
       if (response.status === 429) {
@@ -144,36 +156,56 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
     const quotes: MarketDataQuote[] = [];
 
     for (const request of requests) {
-      const coin = body[request.providerSymbol];
+      const coin =
+        body[request.providerSymbol];
 
       if (!coin) {
         continue;
       }
 
-      const currencyKey = request.quoteCurrency.toLowerCase();
-      const rawPrice = coin[currencyKey];
+      const currencyKey =
+        request.quoteCurrency.toLowerCase();
+
+      const rawPrice =
+        coin[currencyKey];
 
       /**
        * CoinGecko normally returns JSON numbers for simple/price.
        *
-       * Convert the primitive value immediately into a decimal string
-       * and never expose a numeric price to the rest of the application.
+       * Convert the primitive value immediately into a decimal
+       * string and never expose a numeric price to the rest of
+       * the application.
        *
        * PriceFeedService subsequently performs exact decimal scaling.
        */
-      const priceDecimal = this.normalizePrice(rawPrice);
+      const priceDecimal =
+        this.normalizePrice(rawPrice);
 
       if (priceDecimal === undefined) {
         continue;
       }
 
-      const observedAt = this.parseObservedAt(
-        coin.last_updated_at,
-      );
+      /**
+       * The observation timestamp is part of the trust boundary.
+       *
+       * We must never replace a missing or malformed provider
+       * timestamp with the current time because that would make
+       * an undated quote appear fresh.
+       */
+      const observedAt =
+        this.parseObservedAt(
+          coin.last_updated_at,
+        );
+
+      if (!observedAt) {
+        continue;
+      }
 
       quotes.push({
-        providerSymbol: request.providerSymbol,
-        quoteCurrency: request.quoteCurrency,
+        providerSymbol:
+          request.providerSymbol,
+        quoteCurrency:
+          request.quoteCurrency,
         priceDecimal,
         observedAt,
       });
@@ -183,8 +215,8 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
   }
 
   /**
-   * Normalize a CoinGecko price into the provider contract's required
-   * decimal-string representation.
+   * Normalize a CoinGecko price into the provider contract's
+   * required decimal-string representation.
    *
    * The application never receives a numeric price from this provider.
    */
@@ -192,7 +224,8 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
     value: unknown,
   ): string | undefined {
     if (typeof value === 'string') {
-      const normalized = value.trim();
+      const normalized =
+        value.trim();
 
       if (
         normalized.length === 0 ||
@@ -210,15 +243,21 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
       value > 0
     ) {
       /**
-       * CoinGecko's JSON API normally serializes these values as numbers.
+       * CoinGecko's JSON API normally serializes these values
+       * as numbers.
        *
-       * String(value) is used only at the provider boundary to satisfy
-       * the provider contract. PriceFeedService subsequently performs
-       * exact decimal scaling without multiplying the number.
+       * String(value) is used only at the provider boundary
+       * to satisfy the provider contract.
+       *
+       * PriceFeedService subsequently performs exact decimal
+       * scaling without multiplying the number.
        */
-      const normalized = String(value);
+      const normalized =
+        String(value);
 
-      if (!this.isValidDecimal(normalized)) {
+      if (
+        !this.isValidDecimal(normalized)
+      ) {
         return undefined;
       }
 
@@ -231,13 +270,15 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
   /**
    * Validate a positive decimal representation.
    *
-   * Scientific notation is accepted because JSON numeric serialization
-   * can legitimately produce values such as 1e-8.
+   * Scientific notation is accepted because JSON numeric
+   * serialization can legitimately produce values such as 1e-8.
    *
-   * PriceFeedService remains responsible for enforcing the instrument's
-   * configured precision.
+   * PriceFeedService remains responsible for enforcing the
+   * instrument's configured precision.
    */
-  private isValidDecimal(value: string): boolean {
+  private isValidDecimal(
+    value: string,
+  ): boolean {
     return /^[+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(
       value,
     );
@@ -248,40 +289,61 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
    *
    * CoinGecko's last_updated_at is expressed in seconds.
    *
-   * If it is missing or malformed, use the current time rather than
-   * fabricating an old observation timestamp.
+   * IMPORTANT:
+   *
+   * Missing or malformed timestamps are rejected.
+   *
+   * We must not use new Date() as a fallback because doing so
+   * would manufacture freshness metadata and could allow an
+   * undated/stale provider price to pass PriceFeedService's
+   * maxPriceAgeSeconds validation.
    */
-  private parseObservedAt(value: unknown): Date {
+  private parseObservedAt(
+    value: unknown,
+  ): Date | undefined {
     if (
       typeof value === 'number' &&
       Number.isFinite(value) &&
       value > 0
     ) {
-      const date = new Date(value * 1000);
+      const date =
+        new Date(value * 1000);
 
-      if (!Number.isNaN(date.getTime())) {
+      if (
+        !Number.isNaN(
+          date.getTime(),
+        )
+      ) {
         return date;
       }
+
+      return undefined;
     }
 
     if (
       typeof value === 'string' &&
       value.trim().length > 0
     ) {
-      const numeric = Number(value);
+      const numeric =
+        Number(value);
 
       if (
         Number.isFinite(numeric) &&
         numeric > 0
       ) {
-        const date = new Date(numeric * 1000);
+        const date =
+          new Date(numeric * 1000);
 
-        if (!Number.isNaN(date.getTime())) {
+        if (
+          !Number.isNaN(
+            date.getTime(),
+          )
+        ) {
           return date;
         }
       }
     }
 
-    return new Date();
+    return undefined;
   }
 }

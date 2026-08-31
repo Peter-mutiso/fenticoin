@@ -8,11 +8,9 @@ export interface Currency {
 }
 
 export const USD: Currency = { code: 'USD', decimals: 2 };
-export const EUR: Currency = { code: 'EUR', decimals: 2 };
-export const GBP: Currency = { code: 'GBP', decimals: 2 };
+export const KES: Currency = { code: 'KES', decimals: 2 };
 
 export const KNOWN_CURRENCIES: Readonly<Record<string, Currency>> = {
   USD,
-  EUR,
-  GBP,
+  KES,
 };

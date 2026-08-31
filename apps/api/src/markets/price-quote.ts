@@ -1,30 +1,77 @@
+
 import { Money } from '@fenticoin/domain';
 
 import type { Instrument, PriceTick } from '../database/schema';
 
 /**
- * A price tick as exact arithmetic, reusing `@fenticoin/domain`'s `Money`
- * value object — not because a price is currency, but because "an integer
- * count of minor units at N decimal places, safely displayable, never a
- * float" is exactly what a price quote needs too. Any two `PriceQuote`s
- * for the same instrument can be compared exactly (`.compareTo`), which
- * is what makes this a fit foundation for deterministic bet settlement
- * later (see docs/ARCHITECTURE.md §G) — no floating-point rounding can
- * ever flip a win into a loss.
+ * API-safe price quote.
+ *
+ * Internally, prices remain exact Money values so settlement and comparison
+ * never depend on JavaScript floating-point arithmetic.
+ *
+ * At the API boundary, `price` is exposed as a decimal string. This is
+ * intentional: JSON cannot safely represent bigint-based monetary values,
+ * and serialising the Money object directly can result in the frontend
+ * receiving an unexpected object shape or `undefined`.
  */
 export interface PriceQuote {
   instrumentId: string;
-  price: Money;
+
+  /**
+   * Exact decimal representation of the price.
+   *
+   * Example:
+   *   "109234.52000000"
+   *
+   * Never use a JavaScript number for financial/market prices.
+   */
+  price: string;
+
   source: string;
   observedAt: Date;
   receivedAt: Date;
   isStale: boolean;
 }
 
-export function toPriceQuote(tick: PriceTick, instrument: Pick<Instrument, 'quoteCurrency' | 'pricePrecision'>, isStale: boolean): PriceQuote {
+/**
+ * Convert a database price tick into an API-safe PriceQuote.
+ *
+ * The database stores the price as an exact scaled bigint.
+ * Money is used for exact arithmetic and then explicitly converted to its
+ * decimal string representation for JSON/API consumers.
+ */
+export function toPriceQuote(
+  tick: PriceTick,
+  instrument: Pick<
+    Instrument,
+    'quoteCurrency' | 'pricePrecision'
+  >,
+  isStale: boolean,
+): PriceQuote {
+  const money = Money.fromMinorUnits(tick.price, {
+    code: instrument.quoteCurrency,
+    decimals: instrument.pricePrecision,
+  });
+
   return {
     instrumentId: tick.instrumentId,
-    price: Money.fromMinorUnits(tick.price, { code: instrument.quoteCurrency, decimals: instrument.pricePrecision }),
+
+    /**
+     * IMPORTANT:
+     *
+     * Do not return `money` directly here.
+     *
+     * Returning the Money object can produce a serialized structure such as
+     * `{ amount: ..., currency: ... }`, while the frontend expects:
+     *
+     *   quote.price
+     *
+     * as a usable value.
+     *
+     * Convert it explicitly to a decimal string.
+     */
+    price: money.toDecimalString(),
+
     source: tick.source,
     observedAt: tick.observedAt,
     receivedAt: tick.receivedAt,

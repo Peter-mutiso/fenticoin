@@ -15,7 +15,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/database/migrate.ts",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx src/database/seed/seed-rbac.ts && tsx src/database/seed/seed-system-accounts.ts && tsx src/database/seed/seed-instruments.ts && tsx src/database/seed/seed-betting-configs.ts",
+    "db:seed": "node --env-file=.env -e \"require('child_process').execSync('pnpm exec tsx src/database/seed/seed-rbac.ts && pnpm exec tsx src/database/seed/seed-system-accounts.ts && pnpm exec tsx src/database/seed/seed-instruments.ts && pnpm exec tsx src/database/seed/seed-betting-configs.ts', { stdio: 'inherit', shell: true })\"",
     "db:seed:dev-admin": "tsx src/database/seed/seed-dev-admin.ts"
   },
   "dependencies": {
