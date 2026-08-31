@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-
+import { decimalStringToScaledBigInt } from '../markets/decimal';
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
@@ -451,7 +451,10 @@ export class SettlementService {
       selection: bet.selection,
       targetPrice: bet.targetPrice ?? undefined,
       entryPrice: bet.entryPrice,
-      settlementPrice: settlementQuote.price.toMinorUnits(),
+      settlementPrice: decimalStringToScaledBigInt(
+  settlementQuote.price,
+  // We need the instrument precision here.
+),
     });
 
     const idempotencyKey = `bet_settlement:${bet.id}`;

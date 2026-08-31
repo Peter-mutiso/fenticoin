@@ -55,23 +55,7 @@ export function toPriceQuote(
 
   return {
     instrumentId: tick.instrumentId,
-
-    /**
-     * IMPORTANT:
-     *
-     * Do not return `money` directly here.
-     *
-     * Returning the Money object can produce a serialized structure such as
-     * `{ amount: ..., currency: ... }`, while the frontend expects:
-     *
-     *   quote.price
-     *
-     * as a usable value.
-     *
-     * Convert it explicitly to a decimal string.
-     */
     price: money.toDecimalString(),
-
     source: tick.source,
     observedAt: tick.observedAt,
     receivedAt: tick.receivedAt,

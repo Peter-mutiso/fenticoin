@@ -1,4 +1,3 @@
-
 import {
   BadRequestException,
   Inject,
@@ -90,9 +89,7 @@ export class PriceFeedService implements OnModuleInit {
   constructor(
     @Inject(DRIZZLE_CLIENT)
     private readonly db: DrizzleDb,
-
     private readonly instrumentService: InstrumentService,
-
     @Inject(MARKET_DATA_PROVIDER)
     private readonly provider: MarketDataProvider,
   ) {}
@@ -155,8 +152,7 @@ export class PriceFeedService implements OnModuleInit {
       );
     }
 
-    const normalizedPrice =
-      String(quote.priceDecimal).trim();
+    const normalizedPrice = String(quote.priceDecimal).trim();
 
     if (!normalizedPrice) {
       throw new BadRequestException(
@@ -247,8 +243,7 @@ export class PriceFeedService implements OnModuleInit {
 
     const cacheExpired =
       !cached ||
-      Date.now() - cached.cachedAt >
-        CACHE_TTL_MS;
+      Date.now() - cached.cachedAt > CACHE_TTL_MS;
 
     if (cacheExpired) {
       const [dbTick] = await this.db
@@ -282,7 +277,10 @@ export class PriceFeedService implements OnModuleInit {
       );
     }
 
-    this.assertValidTick(tick, instrument);
+    this.assertValidTick(
+      tick,
+      instrument,
+    );
 
     const ageSeconds =
       (Date.now() -
@@ -674,8 +672,10 @@ export class PriceFeedService implements OnModuleInit {
 
       /**
        * Record the timestamp immediately before the actual provider
-       * request. Database/instrument lookup failures therefore do not
-       * incorrectly consume the provider refresh interval.
+       * request.
+       *
+       * Database/instrument lookup failures therefore do not incorrectly
+       * consume the provider refresh interval.
        */
       this.lastProviderRefreshAt =
         Date.now();
@@ -940,7 +940,10 @@ export class PriceFeedService implements OnModuleInit {
       );
     }
 
-    if (tick.price === null || tick.price === undefined) {
+    if (
+      tick.price === null ||
+      tick.price === undefined
+    ) {
       throw new NoPriceAvailableError(
         instrument.id,
       );
@@ -967,6 +970,8 @@ export class PriceFeedService implements OnModuleInit {
   /**
    * Validate the public quote returned to API/frontend consumers.
    *
+   * PriceQuote.price is intentionally a decimal string.
+   *
    * This catches a broken price-quote mapping at the service boundary
    * instead of allowing:
    *
@@ -975,36 +980,67 @@ export class PriceFeedService implements OnModuleInit {
    * to propagate into the frontend.
    */
   private assertValidPriceQuote(
-  quote: PriceQuote,
-  instrument: Instrument,
-): void {
-  if (!quote) {
-    throw new NoPriceAvailableError(instrument.id);
+    quote: PriceQuote,
+    instrument: Instrument,
+  ): void {
+    if (!quote) {
+      throw new NoPriceAvailableError(
+        instrument.id,
+      );
+    }
+
+    const price = quote.price?.trim();
+
+    if (!price) {
+      this.logger.error(
+        `Invalid PriceQuote produced for instrument=${instrument.displaySymbol}. ` +
+          `The PriceQuote mapper did not expose a price value.`,
+      );
+
+      throw new NoPriceAvailableError(
+        instrument.id,
+      );
+    }
+
+    /**
+     * Accept only a normal decimal representation.
+     *
+     * Examples:
+     *   100
+     *   100.25
+     *   0.50
+     *   .50
+     *
+     * Reject:
+     *   NaN
+     *   Infinity
+     *   undefined
+     *   empty strings
+     *   scientific notation
+     *   malformed decimals
+     */
+    if (
+      !/^[+]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(
+        price,
+      )
+    ) {
+      throw new BadRequestException(
+        `Invalid price quote for instrument ${instrument.displaySymbol}`,
+      );
+    }
+
+    if (
+      decimalStringToScaledBigInt(
+        price,
+        instrument.pricePrecision,
+      ) <= 0n
+    ) {
+      throw new BadRequestException(
+        `Invalid price quote for instrument ${instrument.displaySymbol}`,
+      );
+    }
   }
 
-  const price = quote.price?.trim();
-
-  if (!price) {
-    this.logger.error(
-      `Invalid PriceQuote produced for instrument=${instrument.displaySymbol}. ` +
-        `The PriceQuote mapper did not expose a price value.`,
-    );
-
-    throw new NoPriceAvailableError(instrument.id);
-  }
-
-  if (!/^[+]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(price)) {
-    throw new BadRequestException(
-      `Invalid price quote for instrument ${instrument.displaySymbol}`,
-    );
-  }
-
-  if (decimalStringToScaledBigInt(price, instrument.pricePrecision) <= 0n) {
-    throw new BadRequestException(
-      `Invalid price quote for instrument ${instrument.displaySymbol}`,
-    );
-  }
-}
   /**
    * Live tick stream for a specific instrument.
    */
