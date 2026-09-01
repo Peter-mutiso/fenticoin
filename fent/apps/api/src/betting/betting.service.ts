@@ -144,7 +144,7 @@ export class BettingService {
             selection: input.selection,
             stakeAmount: input.stakeAmount,
             currency: instrument.quoteCurrency,
-            entryPrice: priceQuote.price.toMinorUnits(),
+            entryPrice: priceQuote.price,
             entryPriceObservedAt: priceQuote.observedAt,
             entryPriceSource: priceQuote.source,
             targetPrice: targetPriceScaled,

@@ -216,117 +216,130 @@ export class PriceFeedService implements OnModuleInit {
 
     return priceQuote;
   }
+async getLatestPrice(
+  instrumentId: string,
+): Promise<PriceQuote> {
+  const instrument = await this.instrumentService.getById(instrumentId);
 
-  /**
-   * Return the latest trusted price for an instrument.
-   *
-   * A price is valid only if:
-   *
-   * 1. A tick exists.
-   * 2. The tick has a valid positive price.
-   * 3. The tick is not older than maxPriceAgeSeconds.
-   *
-   * Never fabricate a price and never silently use an indefinitely stale
-   * price.
-   */
-  async getLatestPrice(
-    instrumentId: string,
-  ): Promise<PriceQuote> {
-    const instrument =
-      await this.instrumentService.getById(
-        instrumentId,
-      );
-
+  const getFreshTickFromStorage = async (): Promise<PriceTick | undefined> => {
     const cached = this.cache.get(instrumentId);
 
-    let tick = cached?.tick;
-
-    const cacheExpired =
-      !cached ||
-      Date.now() - cached.cachedAt > CACHE_TTL_MS;
-
-    if (cacheExpired) {
-      const [dbTick] = await this.db
-        .select()
-        .from(priceTicks)
-        .where(
-          eq(
-            priceTicks.instrumentId,
-            instrumentId,
-          ),
-        )
-        .orderBy(
-          desc(priceTicks.observedAt),
-        )
-        .limit(1);
-
-      tick = dbTick;
-
-      if (tick) {
-        this.cache.set(instrumentId, {
-          tick,
-          instrument,
-          cachedAt: Date.now(),
-        });
-      }
-    }
-
-    if (!tick) {
-      throw new NoPriceAvailableError(
-        instrumentId,
-      );
-    }
-
-    this.assertValidTick(
-      tick,
-      instrument,
-    );
-
-    const ageSeconds =
-      (Date.now() -
-        tick.observedAt.getTime()) /
-      1000;
-
     if (
-      ageSeconds >
-      instrument.maxPriceAgeSeconds
+      cached &&
+      Date.now() - cached.cachedAt <= CACHE_TTL_MS
     ) {
-      throw new StalePriceError({
-        instrumentId,
-        ageSeconds: Math.round(
-          ageSeconds,
-        ),
-        maxAgeSeconds:
-          instrument.maxPriceAgeSeconds,
+      return cached.tick;
+    }
+
+    const [dbTick] = await this.db
+      .select()
+      .from(priceTicks)
+      .where(eq(priceTicks.instrumentId, instrumentId))
+      .orderBy(desc(priceTicks.observedAt))
+      .limit(1);
+
+    if (dbTick) {
+      this.cache.set(instrumentId, {
+        tick: dbTick,
+        instrument,
+        cachedAt: Date.now(),
       });
     }
 
-    const priceQuote = toPriceQuote(
-      tick,
-      instrument,
-      false,
-    );
+    return dbTick;
+  };
 
-    this.assertValidPriceQuote(
-      priceQuote,
-      instrument,
-    );
+  let tick = await getFreshTickFromStorage();
 
-    return priceQuote;
+  /*
+   * If we already have a valid fresh price, use it immediately.
+   */
+  if (tick) {
+    this.assertValidTick(tick, instrument);
+
+    const ageSeconds =
+      (Date.now() - tick.observedAt.getTime()) / 1000;
+
+    if (ageSeconds <= instrument.maxPriceAgeSeconds) {
+      const priceQuote = toPriceQuote(
+        tick,
+        instrument,
+        false,
+      );
+
+      this.assertValidPriceQuote(
+        priceQuote,
+        instrument,
+      );
+
+      return priceQuote;
+    }
   }
 
-  /**
-   * Return the trusted price associated with a specific settlement time.
+  /*
+   * The stored price is missing or stale.
    *
-   * Settlement policy:
-   *
-   * - Only use a tick that existed at or before the settlement timestamp.
-   * - Select the latest tick at or before that timestamp.
-   * - Never use a future tick.
-   * - The selected tick must be within maxPriceAgeSeconds of settlement.
-   *
-   * This prevents future-price leakage during settlement.
+   * Before rejecting the bet, attempt to obtain a fresh trusted
+   * provider quote immediately.
    */
+  const refreshed = await this.refreshFromProvider(instrument);
+
+  if (refreshed) {
+    const refreshedAgeSeconds =
+      (Date.now() - refreshed.observedAt.getTime()) / 1000;
+
+    if (
+      refreshedAgeSeconds <=
+      instrument.maxPriceAgeSeconds
+    ) {
+      return refreshed;
+    }
+
+    this.logger.warn(
+      `Provider returned stale quote for ` +
+        `instrument=${instrument.displaySymbol} ` +
+        `ageSeconds=${Math.round(refreshedAgeSeconds)} ` +
+        `maxAgeSeconds=${instrument.maxPriceAgeSeconds}`,
+    );
+  }
+
+  /*
+   * Re-read the database once more in case another process/scheduler
+   * inserted a fresh tick while the provider refresh was happening.
+   */
+  tick = await getFreshTickFromStorage();
+
+  if (tick) {
+    this.assertValidTick(tick, instrument);
+
+    const ageSeconds =
+      (Date.now() - tick.observedAt.getTime()) / 1000;
+
+    if (ageSeconds <= instrument.maxPriceAgeSeconds) {
+      const priceQuote = toPriceQuote(
+        tick,
+        instrument,
+        false,
+      );
+
+      this.assertValidPriceQuote(
+        priceQuote,
+        instrument,
+      );
+
+      return priceQuote;
+    }
+
+    throw new StalePriceError({
+      instrumentId,
+      ageSeconds: Math.round(ageSeconds),
+      maxAgeSeconds: instrument.maxPriceAgeSeconds,
+    });
+  }
+
+  throw new NoPriceAvailableError(instrumentId);
+}
+  
   async getPriceForSettlement(
     instrumentId: string,
     at: Date,

@@ -46,11 +46,14 @@ export function toPriceQuote(
   });
 
   return {
-    instrumentId: tick.instrumentId,
-    price: money.toDecimalString(),
-    source: tick.source,
-    observedAt: tick.observedAt,
-    receivedAt: tick.receivedAt,
-    isStale,
-  };
+  instrumentId: tick.instrumentId,
+  price: money.toDecimalString(),
+  quoteCurrency: instrument.quoteCurrency,
+  pricePrecision: instrument.pricePrecision,
+  source: tick.source,
+  observedAt: tick.observedAt,
+  receivedAt: tick.receivedAt,
+  isStale,
+};
 }
+

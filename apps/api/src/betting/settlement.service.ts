@@ -528,7 +528,10 @@ export class SettlementService {
       .set({
         status,
         result,
-        settlementPrice: settlementQuote.price.toMinorUnits(),
+        settlementPrice: decimalStringToScaledBigInt(
+  settlementQuote.price,
+  settlementQuote.pricePrecision,
+),
         settlementPriceObservedAt: settlementQuote.observedAt,
         settledAt: new Date(),
         settlementTransactionId,
@@ -581,6 +584,7 @@ export class SettlementService {
       params.closing.pricePrecision,
     )
   : undefined,
+  
       closingPriceSource: params.closing?.source,
       closingPriceObservedAt: params.closing?.observedAt,
       stakeAmount: params.bet.stakeAmount,
@@ -596,3 +600,4 @@ export class SettlementService {
     });
   }
 }
+

@@ -67,6 +67,8 @@ function priceQuote(
   overrides: Partial<{
     instrumentId: string;
     price: string;
+    quoteCurrency: string;
+    pricePrecision: number;
     source: string;
     observedAt: Date;
     receivedAt: Date;
@@ -76,6 +78,8 @@ function priceQuote(
   return {
     instrumentId: 'inst-btc',
     price: '112503.27',
+    quoteCurrency: 'USD',
+    pricePrecision: 2,
     source: 'TestProvider',
     observedAt: NOW,
     receivedAt: NOW,
@@ -195,7 +199,7 @@ describe('realtime-events — envelope determinism (duplicate-event handling)', 
       observedAt: NOW,
     });
 
-    const event = buildMarketPriceEvent(quote, 'USD');
+    const event = buildMarketPriceEvent(quote, 'USD', );
 
     expect(event.type).toBe('market.price');
     expect(event.entityId).toBe('inst-btc');
