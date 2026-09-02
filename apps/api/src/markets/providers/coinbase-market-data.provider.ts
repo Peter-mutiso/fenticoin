@@ -22,17 +22,11 @@ interface CoinbaseTickerResponse {
 }
 
 /**
- * Maps the provider symbols currently used by the FentiCoin instrument
- * catalogue to Coinbase Exchange product IDs.
+ * Maps the provider symbols used by the instrument catalog to Coinbase
+ * base asset symbols.
  *
- * The application can continue using the existing providerSymbol values
- * such as:
- *
- *   bitcoin -> BTC-USD
- *   xrp     -> XRP-USD
- *
- * If a providerSymbol is already in Coinbase product format, for example
- * BTC-USD, it is used directly.
+ * Instruments may also provide an explicit Coinbase product such as
+ * "BTC-USD". In that case the providerSymbol is used directly.
  */
 const PROVIDER_SYMBOL_MAP: Record<string, string> = {
   bitcoin: 'BTC',
@@ -48,30 +42,14 @@ const PROVIDER_SYMBOL_MAP: Record<string, string> = {
   bitcoin_cash: 'BCH',
 };
 
-/**
- * Coinbase public ticker market-data provider.
- *
- * This provider deliberately uses the timestamp returned by Coinbase.
- * It NEVER manufactures an observation timestamp from the local server
- * clock.
- *
- * That is important because PriceFeedService is responsible for enforcing
- * the configured maxPriceAgeSeconds safety boundary.
- */
 @Injectable()
-export class CoinGeckoMarketDataProvider implements MarketDataProvider {
-  /**
-   * Keep the existing class name so the provider registration/module
-   * configuration does not need to change immediately.
-   *
-   * The actual upstream provider is now Coinbase Exchange.
-   */
+export class CoinbaseMarketDataProvider implements MarketDataProvider {
   readonly name = 'Coinbase';
 
   constructor(private readonly config: AppConfigService) {}
 
   isConfigured(): boolean {
-    // Coinbase's public ticker endpoint does not require an API key.
+    // Coinbase Exchange's public ticker endpoint does not require an API key.
     return true;
   }
 
@@ -84,13 +62,6 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
 
     const quotes: MarketDataQuote[] = [];
 
-    /*
-     * Fetch each requested product independently.
-     *
-     * This intentionally avoids constructing one giant request and makes
-     * it possible for BTC/USD to succeed even if another requested asset
-     * is unavailable on Coinbase.
-     */
     for (const request of requests) {
       const productId = this.toCoinbaseProductId(
         request.providerSymbol,
@@ -111,18 +82,11 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
           observedAt: quote.observedAt,
         });
       } catch (error) {
-        /*
-         * One unavailable instrument should not prevent the remaining
-         * instruments from being refreshed.
-         *
-         * PriceFeedService will continue enforcing its stale-price
-         * protection if no fresh quote is available.
-         */
         const message =
           error instanceof Error ? error.message : String(error);
 
         console.warn(
-          `Coinbase quote failed instrument=${request.providerSymbol}/${request.quoteCurrency} product=${productId} error=${message}`,
+          `[Coinbase] Quote failed instrument=${request.providerSymbol}/${request.quoteCurrency} product=${productId} error=${message}`,
         );
       }
     }
@@ -157,22 +121,11 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
 
     const body = (await response.json()) as CoinbaseTickerResponse;
 
-    if (
-      typeof body.price !== 'string' ||
-      body.price.trim().length === 0
-    ) {
+    if (typeof body.price !== 'string' || body.price.trim().length === 0) {
       throw new Error(`Coinbase returned no price for ${productId}`);
     }
 
-    /*
-     * Coinbase returns the ticker observation time as an ISO timestamp.
-     *
-     * Do not replace this with new Date().
-     */
-    if (
-      typeof body.time !== 'string' ||
-      body.time.trim().length === 0
-    ) {
+    if (typeof body.time !== 'string' || body.time.trim().length === 0) {
       throw new Error(
         `Coinbase returned no observation timestamp for ${productId}`,
       );
@@ -188,12 +141,8 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
 
     const price = body.price.trim();
 
-    /*
-     * Basic decimal validation.
-     *
-     * Do not convert through Number because financial prices should remain
-     * decimal strings throughout the market-data boundary.
-     */
+    // Keep the price as a decimal string.
+    // Do not convert it through Number().
     if (!/^\d+(?:\.\d+)?$/.test(price)) {
       throw new Error(
         `Coinbase returned an invalid decimal price for ${productId}: ${price}`,
@@ -214,12 +163,8 @@ export class CoinGeckoMarketDataProvider implements MarketDataProvider {
     const normalizedCurrency = quoteCurrency.trim().toUpperCase();
 
     /*
-     * If the instrument is already configured as a Coinbase product,
-     * preserve it.
-     *
-     * Example:
-     *   BTC-USD -> BTC-USD
-     *   XRP-USD -> XRP-USD
+     * Allow the instrument catalog to explicitly specify a Coinbase
+     * product such as BTC-USD.
      */
     if (providerSymbol.includes('-')) {
       return providerSymbol.toUpperCase();

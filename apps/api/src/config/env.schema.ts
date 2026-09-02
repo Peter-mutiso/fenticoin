@@ -66,7 +66,9 @@ export const envSchema = z.object({
   // Explicit opt-in to a real market-data provider. Unset means: dev-fixture
   // prices outside production, and a loud "not configured" error (never a
   // silent guess) in production — see markets/providers/providers.module.ts.
-  MARKET_DATA_PROVIDER: z.enum(['coingecko']).optional(),
+  
+MARKET_DATA_PROVIDER: z.enum(['coinbase', 'coingecko']).optional(),
+
   COINGECKO_API_KEY: z.string().optional(),
 
   // Starting balance a freshly-provisioned demo shadow account is funded

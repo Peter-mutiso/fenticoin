@@ -112,110 +112,149 @@ export class PriceFeedService implements OnModuleInit {
     }
   }
 
-  /**
-   * Append a new trusted price tick.
-   *
-   * This is the only method that writes to price_ticks.
-   *
-   * No fabricated, fallback, zero, negative, NaN, or undefined prices
-   * are ever written.
-   */
   async ingestTick(
-    instrument: Instrument,
-    quote: {
-      priceDecimal: string;
-      source: string;
-      observedAt: Date;
-    },
-  ): Promise<PriceQuote> {
-    if (!quote.priceDecimal) {
-      throw new BadRequestException(
-        `Price is missing for instrument ${instrument.displaySymbol}`,
-      );
-    }
+  instrument: Instrument,
+  quote: {
+    priceDecimal: string;
+    source: string;
+    observedAt: Date;
+  },
+): Promise<PriceQuote> {
+  if (!quote.priceDecimal) {
+    throw new BadRequestException(
+      `Price is missing for instrument ${instrument.displaySymbol}`,
+    );
+  }
 
-    if (!quote.source) {
-      throw new BadRequestException(
-        `Price source is missing for instrument ${instrument.displaySymbol}`,
-      );
-    }
+  if (!quote.source) {
+    throw new BadRequestException(
+      `Price source is missing for instrument ${instrument.displaySymbol}`,
+    );
+  }
 
-    if (!(quote.observedAt instanceof Date)) {
-      throw new BadRequestException(
-        `Price observedAt is invalid for instrument ${instrument.displaySymbol}`,
-      );
-    }
+  if (!(quote.observedAt instanceof Date)) {
+    throw new BadRequestException(
+      `Price observedAt is invalid for instrument ${instrument.displaySymbol}`,
+    );
+  }
 
-    if (Number.isNaN(quote.observedAt.getTime())) {
-      throw new BadRequestException(
-        `Price observedAt is invalid for instrument ${instrument.displaySymbol}`,
-      );
-    }
+  if (Number.isNaN(quote.observedAt.getTime())) {
+    throw new BadRequestException(
+      `Price observedAt is invalid for instrument ${instrument.displaySymbol}`,
+    );
+  }
 
-    const normalizedPrice = String(quote.priceDecimal).trim();
+  const now = Date.now();
+  const observedAtMs = quote.observedAt.getTime();
 
-    if (!normalizedPrice) {
-      throw new BadRequestException(
-        `Price is empty for instrument ${instrument.displaySymbol}`,
-      );
-    }
+  /*
+   * A provider must never be allowed to create a future-dated tick.
+   */
+  if (observedAtMs > now + 5_000) {
+    throw new BadRequestException(
+      `Price observedAt is in the future for instrument ${instrument.displaySymbol}`,
+    );
+  }
 
-    const scaled = decimalStringToScaledBigInt(
-      normalizedPrice,
-      instrument.pricePrecision,
+  const normalizedPrice = String(quote.priceDecimal).trim();
+
+  if (!normalizedPrice) {
+    throw new BadRequestException(
+      `Price is empty for instrument ${instrument.displaySymbol}`,
+    );
+  }
+
+  const scaled = decimalStringToScaledBigInt(
+    normalizedPrice,
+    instrument.pricePrecision,
+  );
+
+  if (scaled <= 0n) {
+    throw new BadRequestException(
+      `Price must be positive for instrument ${instrument.displaySymbol}`,
+    );
+  }
+
+  /*
+   * Never allow an older provider observation to become the latest
+   * cached tick.
+   *
+   * The database remains the source of truth.
+   */
+  const [latestTick] = await this.db
+    .select()
+    .from(priceTicks)
+    .where(eq(priceTicks.instrumentId, instrument.id))
+    .orderBy(desc(priceTicks.observedAt))
+    .limit(1);
+
+  if (
+    latestTick &&
+    latestTick.observedAt.getTime() >= observedAtMs
+  ) {
+    this.logger.warn(
+      `Ignoring out-of-order market-data tick ` +
+        `instrument=${instrument.displaySymbol} ` +
+        `provider=${quote.source} ` +
+        `observedAt=${quote.observedAt.toISOString()} ` +
+        `latestObservedAt=${latestTick.observedAt.toISOString()}`,
     );
 
-    if (scaled <= 0n) {
-      throw new BadRequestException(
-        `Price must be positive for instrument ${instrument.displaySymbol}`,
-      );
-    }
-
-    const [tick] = await this.db
-      .insert(priceTicks)
-      .values({
-        instrumentId: instrument.id,
-        price: scaled,
-        source: quote.source,
-        observedAt: quote.observedAt,
-      })
-      .returning();
-
-    if (!tick) {
-      throw new Error('Failed to insert price tick');
-    }
-
-    /**
-     * Update the latest-price cache immediately.
+    /*
+     * Return the existing latest tick rather than replacing it.
      */
-    this.cache.set(instrument.id, {
-      tick,
-      instrument,
-      cachedAt: Date.now(),
-    });
-
     const priceQuote = toPriceQuote(
-      tick,
+      latestTick,
       instrument,
       false,
     );
 
-    /**
-     * Defensive validation of the domain quote before exposing it
-     * through the live stream.
-     *
-     * This prevents an invalid quote from propagating to SSE/WebSocket
-     * consumers and ultimately producing "price: undefined" in the UI.
-     */
     this.assertValidPriceQuote(
       priceQuote,
       instrument,
     );
 
-    this.ticks$.next(priceQuote);
-
     return priceQuote;
   }
+
+  const [tick] = await this.db
+    .insert(priceTicks)
+    .values({
+      instrumentId: instrument.id,
+      price: scaled,
+      source: quote.source,
+      observedAt: quote.observedAt,
+    })
+    .returning();
+
+  if (!tick) {
+    throw new Error('Failed to insert price tick');
+  }
+
+  /*
+   * Only update the cache with the newly observed latest tick.
+   */
+  this.cache.set(instrument.id, {
+    tick,
+    instrument,
+    cachedAt: Date.now(),
+  });
+
+  const priceQuote = toPriceQuote(
+    tick,
+    instrument,
+    false,
+  );
+
+  this.assertValidPriceQuote(
+    priceQuote,
+    instrument,
+  );
+
+  this.ticks$.next(priceQuote);
+
+  return priceQuote;
+}
 async getLatestPrice(
   instrumentId: string,
 ): Promise<PriceQuote> {

@@ -1,12 +1,15 @@
+
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+
 import {
   ArrowDown,
   ArrowUp,
   LoaderCircle,
   ShieldCheck,
 } from 'lucide-react';
+
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -19,13 +22,16 @@ import {
   listInstruments,
   placeBet,
 } from '@/lib/api-client';
+
 import { describeApiError } from '@/lib/api-errors';
 import { useAuth } from '@/lib/auth/AuthContext';
+
 import {
   estimatePotentialPayoutMinorUnits,
   formatCurrencyMinorUnits,
   parseStakeToMinorUnits,
 } from '@/lib/money';
+
 import { useInstrumentRealtimeSubscription } from '@/lib/realtime/RealtimeProvider';
 import { useDialogA11y } from '@/lib/useDialogA11y';
 import { PriceQuoteBadge } from '@/components/markets/PriceQuoteBadge';
@@ -96,9 +102,7 @@ export function BettingExperience() {
   const [selection, setSelection] = useState('rise');
   const [stake, setStake] = useState('');
   const [targetPrice, setTargetPrice] = useState('');
-  const [durationSeconds, setDurationSeconds] = useState<number | null>(
-    null,
-  );
+  const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -123,6 +127,17 @@ export function BettingExperience() {
 
   const instruments = instrumentsQuery.data?.items ?? [];
 
+  useEffect(() => {
+    if (!instrumentId && instruments.length > 0) {
+      const defaultInstrument =
+        instruments.find((item) => item.status === 'active') ?? instruments[0];
+
+      if (defaultInstrument) {
+        setInstrumentId(defaultInstrument.id);
+      }
+    }
+  }, [instruments, instrumentId]);
+
   const instrument = instruments.find(
     (item) => item.id === instrumentId,
   );
@@ -130,12 +145,13 @@ export function BettingExperience() {
   useInstrumentRealtimeSubscription(instrumentId || undefined);
 
   /*
-   * Browser price is informational only.
+   * Price is DISPLAY-ONLY on this screen.
    *
-   * The server remains authoritative for the actual entry price,
-   * market validity and settlement.
+   * It is deliberately NOT required for Review or Confirm.
+   *
+   * The backend remains responsible for obtaining and validating the
+   * authoritative entry price when placeBet() is called.
    */
-
   const priceQuery = useQuery({
     queryKey: ['price', instrumentId],
     queryFn: () => getPrice(instrumentId),
@@ -199,8 +215,7 @@ export function BettingExperience() {
 
   useEffect(() => {
     setSelection(
-      PRODUCTS.find((item) => item.type === type)?.choices[0] ??
-        'rise',
+      PRODUCTS.find((item) => item.type === type)?.choices[0] ?? 'rise',
     );
 
     setTargetPrice('');
@@ -307,12 +322,6 @@ export function BettingExperience() {
       minorStake <= balance,
   );
 
-  /*
-   * Higher / Lower requires a valid user-supplied strike.
-   *
-   * The browser quote is NOT required for this validation.
-   */
-
   const targetPriceValid =
     type !== 'higher_lower' ||
     /^\d+(?:\.\d+)?$/.test(targetPrice.trim());
@@ -333,11 +342,8 @@ export function BettingExperience() {
    * PRICE STATUS
    * --------------------------------------------------------------------------
    *
-   * Informational only.
-   *
-   * A missing/stale browser quote does not globally disable betting.
-   * The API obtains and validates the authoritative price server-side.
-   * --------------------------------------------------------------------------
+   * These values are informational only.
+   * They are NOT part of the Review/Confirm gate.
    */
 
   const priceAvailable = Boolean(priceQuery.data);
@@ -353,21 +359,10 @@ export function BettingExperience() {
    * --------------------------------------------------------------------------
    *
    * IMPORTANT:
+   * There is intentionally NO priceAvailable / priceFresh check here.
    *
-   * priceAvailable is intentionally NOT included here.
-   *
-   * This allows:
-   * - instrument selection
-   * - direction selection
-   * - Higher / Lower strike entry
-   * - stake entry
-   * - duration selection
-   * - Review Bet
-   *
-   * to continue even while the browser quote is unavailable.
-   *
-   * The server remains authoritative when Confirm Bet is pressed.
-   * --------------------------------------------------------------------------
+   * The browser's market quote is only a display/estimate.
+   * The server obtains the authoritative price when placeBet() executes.
    */
 
   const reviewChecks = {
@@ -401,43 +396,20 @@ export function BettingExperience() {
 
   /*
    * --------------------------------------------------------------------------
-   * DEVELOPMENT LOGGING
-   * --------------------------------------------------------------------------
-   */
-
-  if (typeof window !== 'undefined') {
-    console.log(
-      '[FentiCoin] Review checks:',
-      reviewChecks,
-    );
-
-    console.log(
-      '[FentiCoin] Betting state:',
-      {
-        authStatus,
-        instrument,
-        price: priceQuery.data,
-        priceAvailable,
-        priceFresh,
-        config: configQuery.data,
-        wallet: walletQuery.data,
-        stake,
-        minorStake: minorStake?.toString(),
-        minStake: minStake?.toString(),
-        maxStake: maxStake?.toString(),
-        balance: balance?.toString(),
-        durationSeconds,
-        targetPrice,
-        type,
-        selection,
-      },
-    );
-  }
-
-  /*
-   * --------------------------------------------------------------------------
    * CONFIRM BET
    * --------------------------------------------------------------------------
+   *
+   * IMPORTANT:
+   * Do NOT refetch the frontend price here.
+   *
+   * placeBet() sends the bet parameters only.
+   * The backend remains responsible for:
+   *   - obtaining the authoritative market price
+   *   - validating freshness
+   *   - deriving entryPrice
+   *   - calculating exposure/payout
+   *   - reserving funds
+   *   - creating the bet
    */
 
   async function confirmBet() {
@@ -531,8 +503,7 @@ export function BettingExperience() {
 
   function openReview() {
     reviewedPayoutRateBasisPoints.current =
-      configQuery.data?.payoutRateBasisPoints ??
-      null;
+      configQuery.data?.payoutRateBasisPoints ?? null;
 
     setReviewing(true);
     setSubmitError(null);
@@ -595,6 +566,7 @@ export function BettingExperience() {
       <div className="grid gap-5 lg:grid-cols-[1.25fr_.75fr]">
         <div className="space-y-5">
           {/* MARKET */}
+
           <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-sm font-semibold text-neutral-900">
               1. Choose a market
@@ -696,6 +668,7 @@ export function BettingExperience() {
           </div>
 
           {/* DIRECTION / STAKE / DURATION */}
+
           <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-sm font-semibold text-neutral-900">
               2. Pick your direction
@@ -840,8 +813,7 @@ export function BettingExperience() {
                           )
                         }
                         className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-                          durationSeconds ===
-                          preset.seconds
+                          durationSeconds === preset.seconds
                             ? 'bg-brand-500 text-navy-950'
                             : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                         }`}
@@ -874,6 +846,7 @@ export function BettingExperience() {
         </div>
 
         {/* SUMMARY */}
+
         <aside className="h-fit rounded-2xl bg-navy-950 p-5 text-white shadow-sm sm:p-6">
           <p className="text-sm font-semibold text-white/65">
             Bet summary
@@ -907,8 +880,7 @@ export function BettingExperience() {
                 durationSeconds !== null
                   ? DURATION_PRESETS.find(
                       (preset) =>
-                        preset.seconds ===
-                        durationSeconds,
+                        preset.seconds === durationSeconds,
                     )?.label ??
                     `${durationSeconds}s`
                   : '—'
@@ -1104,55 +1076,43 @@ function ReviewModal({
         <div className="mt-5 rounded-xl bg-neutral-50 p-4 text-sm">
           <div className="flex justify-between">
             <span>Stake</span>
-
             <strong>{stake}</strong>
           </div>
 
           <div className="mt-3 flex justify-between">
             <span>Estimated return</span>
-
             <strong>~{estimate}</strong>
           </div>
         </div>
 
-        <p className="mt-4 text-xs leading-5 text-neutral-500">
-          Final odds, entry price, and return are
-          determined by the server when you confirm.
-          If the market is no longer valid, the server
-          can reject the bet safely.
-        </p>
-
         {error && (
           <Notice
             text={error.title}
-            className="mt-3"
+            className="mt-4"
           />
         )}
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className="mt-6 flex gap-3">
           <button
             type="button"
             disabled={submitting}
             onClick={onCancel}
-            className="rounded-full bg-neutral-100 px-4 py-3 font-semibold disabled:opacity-50"
+            className="w-full rounded-full border border-neutral-200 py-3 font-semibold transition hover:bg-neutral-50 disabled:opacity-50"
           >
-            Back
+            Cancel
           </button>
 
           <button
             type="button"
             disabled={submitting}
             onClick={onConfirm}
-            className="flex items-center justify-center rounded-full bg-brand-500 px-4 py-3 font-semibold text-navy-950 disabled:opacity-60"
+            className="flex w-full items-center justify-center rounded-full bg-brand-500 py-3 font-bold transition hover:bg-brand-600 disabled:opacity-50"
           >
             {submitting ? (
-              <>
-                <LoaderCircle
-                  className="mr-2 h-4 w-4 animate-spin"
-                  aria-hidden="true"
-                />
-                Confirming
-              </>
+              <LoaderCircle
+                className="h-5 w-5 animate-spin"
+                aria-hidden="true"
+              />
             ) : (
               'Confirm bet'
             )}
